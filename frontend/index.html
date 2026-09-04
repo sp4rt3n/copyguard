@@ -1,0 +1,3233 @@
+<title>CopyGuard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --bg:           #0B0D12;
+    --surface:      #141720;
+    --surface-2:    #1D2235;
+    --surface-3:    #242840;
+    --border:       #252B3C;
+    --border-light: #303650;
+    --text:         #D8DFF0;
+    --text-muted:   #6B7590;
+    --text-dim:     #424C6A;
+    --accent:       #06C896;
+    --accent-dim:   rgba(6,200,150,.12);
+    --risk-high:    #EF4444;
+    --risk-high-bg: rgba(239,68,68,.1);
+    --risk-med:     #F59E0B;
+    --risk-med-bg:  rgba(245,158,11,.1);
+    --risk-low:     #22C55E;
+    --risk-low-bg:  rgba(34,197,94,.1);
+    --font-display: 'Syne', system-ui, sans-serif;
+    --font-body:    'DM Sans', system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
+    --radius:       6px;
+    --radius-lg:    10px;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg:           #F0F2F7;
+      --surface:      #FFFFFF;
+      --surface-2:    #F5F7FC;
+      --surface-3:    #EBEEF7;
+      --border:       #DDE1EE;
+      --border-light: #C8CEDF;
+      --text:         #1A1F35;
+      --text-muted:   #5A6280;
+      --text-dim:     #9BA3BF;
+      --accent-dim:   rgba(6,200,150,.08);
+      --risk-high-bg: rgba(239,68,68,.07);
+      --risk-med-bg:  rgba(245,158,11,.07);
+      --risk-low-bg:  rgba(34,197,94,.07);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:           #F0F2F7;
+    --surface:      #FFFFFF;
+    --surface-2:    #F5F7FC;
+    --surface-3:    #EBEEF7;
+    --border:       #DDE1EE;
+    --border-light: #C8CEDF;
+    --text:         #1A1F35;
+    --text-muted:   #5A6280;
+    --text-dim:     #9BA3BF;
+    --accent-dim:   rgba(6,200,150,.08);
+    --risk-high-bg: rgba(239,68,68,.07);
+    --risk-med-bg:  rgba(245,158,11,.07);
+    --risk-low-bg:  rgba(34,197,94,.07);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 54px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -.3px;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .logo-mark {
+    width: 27px; height: 27px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .api-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+  }
+  .api-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background .3s;
+  }
+  .api-dot.online { background: var(--accent); box-shadow: 0 0 6px rgba(6,200,150,.4); }
+  .api-dot.error  { background: var(--risk-high); }
+
+  .btn-ghost {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: var(--radius);
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font-body);
+    transition: border-color .15s, color .15s;
+  }
+  .btn-ghost:hover { border-color: var(--border-light); color: var(--text); }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: calc(100vh - 54px);
+  }
+
+  /* Left panel */
+  .left-panel {
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel-label {
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  /* URL input */
+  .url-input-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .url-row {
+    display: flex;
+    gap: 6px;
+  }
+  .url-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+    min-width: 0;
+  }
+  .url-input::placeholder { color: var(--text-dim); }
+  .url-input:focus { border-color: var(--accent); }
+
+  .url-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius);
+    color: #0B0D12;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    transition: opacity .15s;
+    flex-shrink: 0;
+  }
+  .url-btn:hover { opacity: .85; }
+  .url-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .url-platforms { display: flex; gap: 5px; flex-wrap: wrap; }
+  .plat-chip {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .plat-chip.yt { border-color: rgba(255,0,0,.3); color: #FF6B6B; background: rgba(255,0,0,.05); }
+  .plat-chip.fb { border-color: rgba(66,103,178,.35); color: #7B9FE0; background: rgba(66,103,178,.07); }
+  .plat-chip.ig { border-color: rgba(225,48,108,.3); color: #F06292; background: rgba(225,48,108,.05); }
+  .plat-chip.tt { border-color: rgba(0,242,234,.3); color: #4DD0C4; background: rgba(0,242,234,.05); }
+
+  .divider-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .divider-label::before, .divider-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Drop zone */
+  .dropzone {
+    border: 1.5px dashed var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+    background: var(--surface);
+  }
+  .dropzone.drag-over { border-color: var(--accent); background: var(--accent-dim); }
+  .dropzone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+  .drop-icon {
+    width: 40px; height: 40px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    margin: 0 auto 12px;
+    color: var(--accent);
+  }
+  .drop-title { font-family: var(--font-display); font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+  .drop-sub { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+  .drop-types { display: flex; gap: 5px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+  .type-chip {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  /* Queue */
+  .queue-list { display: flex; flex-direction: column; gap: 7px; }
+
+  .queue-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 11px;
+    cursor: pointer;
+    transition: border-color .15s;
+    overflow: hidden;
+  }
+  .queue-item:hover { border-color: var(--border-light); }
+  .queue-item.active { border-color: var(--accent); background: var(--accent-dim); }
+
+  .queue-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .queue-filename {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 190px;
+  }
+  .queue-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; align-items: center; }
+
+  .progress-bar { height: 2px; background: var(--border); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width .4s; width: 0%; background: var(--accent); }
+  .progress-fill.done { width: 100%; }
+  .progress-fill.scanning { animation: pulse-bar 1.4s ease-in-out infinite alternate; }
+  .progress-fill.error { width: 100%; background: var(--risk-high); }
+  @keyframes pulse-bar { from { width: 25%; } to { width: 75%; } }
+
+  /* Badges */
+  .risk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .risk-badge.high    { background: var(--risk-high-bg); color: var(--risk-high); }
+  .risk-badge.medium  { background: var(--risk-med-bg);  color: var(--risk-med);  }
+  .risk-badge.low     { background: var(--risk-low-bg);  color: var(--risk-low);  }
+  .risk-badge.scanning{ background: var(--accent-dim);   color: var(--accent); }
+  .risk-badge.unknown { background: var(--surface-2);    color: var(--text-muted); }
+  .risk-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  .file-type-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .file-type-badge.video { background: rgba(99,102,241,.15); color: #818CF8; }
+  .file-type-badge.audio { background: rgba(139,92,246,.15); color: #A78BFA; }
+  .file-type-badge.image { background: rgba(251,146,60,.15);  color: #FB923C; }
+
+  /* Right panel */
+  .right-panel { padding: 24px 28px; display: flex; flex-direction: column; gap: 24px; }
+
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; flex: 1; gap: 14px;
+    padding: 60px 20px; text-align: center; color: var(--text-dim);
+  }
+  .empty-state svg { opacity: .25; }
+  .empty-state p { font-size: 13px; color: var(--text-muted); max-width: 260px; line-height: 1.6; }
+
+  /* Result header */
+  .result-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .result-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -.3px;
+    text-wrap: balance;
+    margin-bottom: 4px;
+    word-break: break-all;
+  }
+  .result-meta { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
+
+  /* Stat cards */
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 10px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .07em; }
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-value.danger { color: var(--risk-high); }
+  .stat-value.warn   { color: var(--risk-med); }
+  .stat-value.good   { color: var(--risk-low); }
+
+  /* Timeline */
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: .02em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .count-pill {
+    background: var(--surface-3);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-family: var(--font-mono);
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  .timeline-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+  }
+  .timeline-bar {
+    display: flex;
+    height: 28px;
+    border-radius: 5px;
+    overflow: hidden;
+    gap: 1px;
+    background: var(--border);
+    margin-bottom: 10px;
+  }
+  .tl-seg {
+    flex: 1;
+    cursor: pointer;
+    transition: opacity .15s, filter .15s;
+    position: relative;
+  }
+  .tl-seg.clean   { background: var(--risk-low-bg); }
+  .tl-seg.hit     { background: var(--risk-high); }
+  .tl-seg.error   { background: var(--surface-3); }
+  .tl-seg:hover   { filter: brightness(1.3); }
+
+  .tl-seg.hit::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,.1);
+    animation: flash 1.5s ease-in-out infinite alternate;
+  }
+  @keyframes flash { from { opacity: 0; } to { opacity: 1; } }
+
+  .timeline-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .timeline-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  /* Segment tooltip */
+  .tl-tooltip {
+    position: fixed;
+    background: var(--surface-3);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text);
+    pointer-events: none;
+    z-index: 200;
+    white-space: nowrap;
+    display: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  }
+
+  /* Violations */
+  .violation-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .violation-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .violation-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .v-icon {
+    width: 36px; height: 36px;
+    border-radius: var(--radius);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .v-icon.music { background: rgba(139,92,246,.15); color: #A78BFA; }
+  .v-icon.image { background: rgba(251,146,60,.15);  color: #FB923C; }
+
+  .v-title { font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--text); }
+  .v-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+
+  /* Timestamp badge — main feature */
+  .timestamp-badge {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--risk-high-bg);
+    border: 1px solid rgba(239,68,68,.25);
+    border-radius: var(--radius);
+    padding: 5px 10px;
+    flex-shrink: 0;
+  }
+  .timestamp-badge svg { color: var(--risk-high); }
+  .ts-label { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+  .ts-value { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--risk-high); }
+
+  /* Copyright details grid */
+  .v-details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+  .v-detail-cell {
+    padding: 12px 16px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .v-detail-cell:nth-child(3n) { border-right: none; }
+  .v-detail-cell:nth-last-child(-n+3) { border-bottom: none; }
+
+  .vd-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 3px; }
+  .vd-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .vd-value a { color: var(--accent); text-decoration: none; }
+  .vd-value a:hover { text-decoration: underline; }
+  .vd-value.empty { color: var(--text-dim); }
+
+  /* Segment table */
+  .seg-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .seg-table-wrap .scroll { overflow-x: auto; }
+  .seg-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .seg-table th {
+    text-align: left;
+    padding: 8px 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    background: var(--surface-2);
+  }
+  .seg-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    vertical-align: middle;
+  }
+  .seg-table tr:last-child td { border-bottom: none; }
+  .seg-table tr.hit-row td { background: var(--risk-high-bg); }
+  .seg-table tr.hit-row:hover td { filter: brightness(1.1); }
+  .seg-table tr:not(.hit-row):hover td { background: var(--surface-2); }
+
+  .seg-time {
+    font-weight: 500;
+    color: var(--text);
+  }
+  .seg-time.hit { color: var(--risk-high); }
+
+
+  /* Tabs */
+  .tabs { display: flex; gap: 2px; background: var(--surface-2); border-radius: var(--radius); padding: 3px; }
+  .tab-btn {
+    flex: 1; padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer;
+    font-family: var(--font-display); font-size: 11px; font-weight: 600; letter-spacing: .03em;
+    background: transparent; color: var(--text-muted); transition: background .15s, color .15s;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+
+  /* Channel scan */
+  .channel-wrap { display: flex; flex-direction: column; gap: 10px; }
+  .channel-desc { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+  .max-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+  .max-row input[type=number] {
+    width: 62px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 5px 8px; color: var(--text);
+    font-family: var(--font-mono); font-size: 11px; outline: none;
+  }
+  .max-row input[type=number]:focus { border-color: var(--accent); }
+
+  /* Batch cards */
+  .batch-list { display: flex; flex-direction: column; gap: 7px; }
+  .batch-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 12px; cursor: pointer;
+    transition: border-color .15s;
+  }
+  .batch-item:hover { border-color: var(--border-light); }
+  .batch-item.active { border-color: var(--accent); background: var(--accent-dim); }
+  .batch-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+  .batch-name { font-family: var(--font-mono); font-size: 10px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+  .batch-progress-bar { height: 3px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .batch-progress-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .4s; }
+  .batch-stats { display: flex; gap: 10px; font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 4px; }
+  .batch-stat-vio { color: var(--risk-high); }
+
+  /* Batch detail */
+  .batch-detail { display: flex; flex-direction: column; gap: 20px; }
+  .batch-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .batch-video-list { display: flex; flex-direction: column; gap: 8px; }
+  .batch-video-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 13px;
+    font-size: 12px; cursor: pointer; transition: border-color .15s;
+  }
+  .batch-video-row:hover { border-color: var(--border-light); }
+  .batch-video-row.flagged { border-color: rgba(239,68,68,.35); background: var(--risk-high-bg); }
+  .batch-video-title { flex: 1; font-family: var(--font-mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .batch-video-status { flex-shrink: 0; }
+
+  /* History */
+  .history-section { border-top: 1px solid var(--border); padding: 24px 28px; }
+  .history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .history-title { font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--text); }
+
+  .filter-row { display: flex; gap: 8px; align-items: center; }
+  .filter-chip {
+    font-size: 11px; font-family: var(--font-mono); padding: 3px 9px;
+    border-radius: 10px; border: 1px solid var(--border); background: transparent;
+    color: var(--text-muted); cursor: pointer; transition: all .15s;
+  }
+  .filter-chip.active { background: var(--risk-high-bg); border-color: rgba(239,68,68,.4); color: var(--risk-high); }
+
+  .history-table-wrap { overflow-x: auto; }
+  .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .history-table th {
+    text-align: left;
+    padding: 7px 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .history-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  .history-table tbody tr { cursor: pointer; transition: background .1s; }
+  .history-table tbody tr:hover td { background: var(--surface-2); }
+  .history-table tbody tr:last-child td { border-bottom: none; }
+
+  .h-filename { font-family: var(--font-mono); font-size: 11px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .violations-count { font-family: var(--font-mono); font-size: 12px; }
+  .violations-count.has { color: var(--risk-high); }
+  .violations-count.none { color: var(--text-muted); }
+  .h-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+  /* Scanning */
+  .scanning-state { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 48px 20px; text-align: center; }
+  .scan-ring { width: 48px; height: 48px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  .scan-step { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 4px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Stolen content finder */
+  .finder-wrap { display: flex; flex-direction: column; gap: 16px; }
+  .finder-field { display: flex; flex-direction: column; gap: 5px; }
+  .finder-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; }
+  .finder-input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 9px 11px; font-family: var(--font-body);
+    font-size: 13px; color: var(--text); outline: none; transition: border-color .15s;
+  }
+  .finder-input:focus { border-color: var(--accent); }
+  .finder-input::placeholder { color: var(--text-dim); }
+  .platform-row { display: flex; gap: 6px; }
+  .plat-btn {
+    flex: 1; padding: 7px 0; border: 1px solid var(--border); border-radius: var(--radius);
+    background: transparent; color: var(--text-muted); font-size: 11px; font-family: var(--font-display);
+    font-weight: 600; cursor: pointer; transition: all .15s; text-align: center;
+  }
+  .plat-btn.sel-yt { background: rgba(255,0,0,.08); border-color: rgba(255,0,0,.4); color: #FF6B6B; }
+  .plat-btn.sel-fb { background: rgba(66,103,178,.1); border-color: rgba(66,103,178,.45); color: #7B9FE0; }
+  .search-btn {
+    width: 100%; padding: 10px; background: var(--accent); border: none; border-radius: var(--radius);
+    color: #0B0D12; font-family: var(--font-display); font-weight: 700; font-size: 13px;
+    cursor: pointer; transition: opacity .15s; letter-spacing: .02em;
+  }
+  .search-btn:hover { opacity: .85; }
+  .search-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* Results grid */
+  .results-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .results-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
+  .results-meta { font-size: 12px; color: var(--text-muted); }
+  .stolen-badge-count {
+    background: var(--risk-high-bg); color: var(--risk-high);
+    border: 1px solid rgba(239,68,68,.3); border-radius: var(--radius);
+    padding: 3px 10px; font-size: 11px; font-family: var(--font-display); font-weight: 700;
+  }
+
+  .duration-filter-row {
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 10px; font-size: 11px;
+  }
+  .dur-label { color: var(--text-muted); font-weight: 500; white-space: nowrap; margin-right: 2px; }
+  .dur-preset {
+    padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--surface-3); color: var(--text-muted);
+    cursor: pointer; font-size: 11px; transition: all .15s; white-space: nowrap;
+  }
+  .dur-preset:hover { border-color: var(--accent); color: var(--accent); }
+  .dur-preset.active-dur { background: var(--accent-dim); border-color: rgba(6,200,150,.4); color: var(--accent); }
+  .dur-sep { color: var(--text-dim); }
+  .dur-custom { display: flex; align-items: center; gap: 4px; margin-left: 4px; }
+  .dur-input {
+    width: 48px; padding: 2px 6px; border-radius: var(--radius); font-size: 11px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-family: var(--font-mono); text-align: center;
+  }
+  .dur-input:focus { outline: none; border-color: var(--accent); }
+  .dur-apply {
+    padding: 2px 8px; border-radius: var(--radius); font-size: 11px;
+    border: 1px solid var(--border); background: var(--surface-3); color: var(--text-muted);
+    cursor: pointer; transition: all .15s;
+  }
+  .dur-apply:hover { border-color: var(--accent); color: var(--accent); }
+  .result-filters { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .rf-chip {
+    padding: 4px 11px; border-radius: 20px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-muted); font-size: 11px; font-family: var(--font-mono);
+    cursor: pointer; transition: all .15s;
+  }
+  .rf-chip.active-stolen { background: var(--risk-high-bg); border-color: rgba(239,68,68,.4); color: var(--risk-high); }
+  .rf-chip.active-all { background: var(--accent-dim); border-color: rgba(6,200,150,.35); color: var(--accent); }
+  .rf-chip.active-shorts { background: rgba(99,102,241,.12); border-color: rgba(99,102,241,.4); color: #818CF8; }
+  .rf-chip.active-channels { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.4); color: #F59E0B; }
+
+  /* Content type selection boxes */
+  .type-box {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 9px 6px; border: 1.5px solid var(--border); border-radius: var(--radius-lg);
+    cursor: pointer; transition: all .15s; text-align: center; position: relative;
+    background: var(--surface);
+  }
+  .type-box input[type=checkbox] { position: absolute; opacity: 0; width: 0; height: 0; }
+  .type-box.active { border-color: var(--accent); background: var(--accent-dim); }
+  .type-box-icon { font-size: 18px; line-height: 1; }
+  .type-box-label { font-size: 11px; font-weight: 700; color: var(--text-primary); font-family: var(--font-display); }
+  .type-box-sub { font-size: 9px; color: var(--text-muted); }
+  .type-box.active .type-box-label { color: var(--accent); }
+
+  /* Channel grouping card */
+  .channel-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    overflow: hidden; transition: border-color .15s;
+  }
+  .channel-card:hover { border-color: var(--border-light); }
+  .channel-card.is-confirmed { border-color: rgba(239,68,68,.5); }
+  .channel-card-header {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    cursor: pointer; user-select: none;
+  }
+  .channel-card-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--surface-2); display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .channel-card-name { font-size: 13px; font-weight: 700; font-family: var(--font-display); }
+  .channel-card-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .channel-card-badge { margin-left: auto; flex-shrink: 0; }
+  .channel-card-videos { padding: 0 12px 12px; display: grid; gap: 8px; }
+  .channel-card-videos.hidden { display: none; }
+
+  /* Confirm / Dismiss buttons */
+  .confirm-row { display: flex; gap: 6px; margin-top: 8px; }
+  .btn-confirm {
+    flex: 1; padding: 5px 0; border-radius: var(--radius); font-size: 11px; font-weight: 600;
+    border: 1.5px solid rgba(34,197,94,.4); color: #4ADE80; background: rgba(34,197,94,.08);
+    cursor: pointer; transition: all .15s; font-family: var(--font-display);
+  }
+  .btn-confirm:hover { background: rgba(34,197,94,.18); }
+  .btn-confirm.selected { background: rgba(34,197,94,.25); border-color: rgba(34,197,94,.7); }
+  .btn-dismiss {
+    flex: 1; padding: 5px 0; border-radius: var(--radius); font-size: 11px; font-weight: 600;
+    border: 1.5px solid var(--border); color: var(--text-muted); background: transparent;
+    cursor: pointer; transition: all .15s; font-family: var(--font-display);
+  }
+  .btn-dismiss:hover { background: var(--surface-2); border-color: var(--border-light); }
+  .btn-dismiss.selected { background: var(--surface-2); border-color: rgba(156,163,175,.6); color: var(--text-primary); }
+  .video-card.is-dismissed { opacity: .45; }
+  .video-card.is-confirmed-stolen { border-color: rgba(239,68,68,.6); box-shadow: 0 0 0 1px rgba(239,68,68,.2); }
+
+  .short-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: rgba(99,102,241,.12); color: #818CF8;
+    border: 1px solid rgba(99,102,241,.3); border-radius: 3px;
+    font-size: 9px; font-family: var(--font-display); font-weight: 700;
+    padding: 2px 6px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px;
+  }
+
+  .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+  .video-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden;
+    transition: border-color .15s, transform .15s;
+  }
+  .video-card:hover { border-color: var(--border-light); transform: translateY(-1px); }
+  .video-card.is-stolen { border-color: rgba(239,68,68,.4); }
+  .video-card.is-official { border-color: rgba(6,200,150,.3); opacity: .7; }
+  .video-card.compact { border-radius: var(--radius); }
+  .video-card.compact .video-thumb { aspect-ratio: 16/7; }
+
+  .video-thumb {
+    width: 100%; aspect-ratio: 16/9; object-fit: cover;
+    background: var(--surface-2); display: block;
+  }
+  .video-thumb-placeholder {
+    width: 100%; aspect-ratio: 16/9;
+    background: var(--surface-2); display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim);
+  }
+  .video-body { padding: 11px 13px; }
+  .video-title {
+    font-family: var(--font-display); font-size: 12px; font-weight: 600;
+    color: var(--text); margin-bottom: 6px; line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .video-channel {
+    font-size: 11px; color: var(--text-muted); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 5px; font-family: var(--font-mono);
+  }
+  .video-channel a { color: inherit; text-decoration: none; }
+  .video-channel a:hover { color: var(--accent); }
+  .stolen-flag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--risk-high-bg); color: var(--risk-high);
+    border: 1px solid rgba(239,68,68,.3); border-radius: 3px;
+    font-size: 9px; font-family: var(--font-display); font-weight: 700;
+    padding: 2px 6px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px;
+  }
+  .official-flag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(6,200,150,.08); color: var(--accent);
+    border: 1px solid rgba(6,200,150,.25); border-radius: 3px;
+    font-size: 9px; font-family: var(--font-display); font-weight: 700;
+    padding: 2px 6px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px;
+  }
+  .video-stats { display: flex; gap: 10px; font-size: 11px; font-family: var(--font-mono); color: var(--text-dim); margin-bottom: 10px; }
+  .video-actions { display: flex; gap: 6px; }
+  .v-act-btn {
+    flex: 1; padding: 5px 0; border-radius: var(--radius); font-size: 11px;
+    font-family: var(--font-display); font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+    transition: all .15s; text-align: center; text-decoration: none; display: block;
+  }
+  .v-act-btn:hover { border-color: var(--border-light); color: var(--text); }
+  .v-act-btn.report { border-color: rgba(239,68,68,.3); color: var(--risk-high); background: var(--risk-high-bg); }
+  .v-act-btn.report:hover { opacity: .8; }
+
+  .error-notice {
+    background: var(--risk-high-bg);
+    border: 1px solid rgba(239,68,68,.25);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--risk-high);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* Toast */
+  .toast-container { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 7px; z-index: 300; pointer-events: none; }
+  .toast {
+    background: var(--surface-2);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 9px 14px;
+    font-size: 12px;
+    color: var(--text);
+    box-shadow: 0 4px 20px rgba(0,0,0,.3);
+    animation: slideUp .2s ease;
+    pointer-events: auto;
+    max-width: 300px;
+  }
+  .toast.success { border-color: rgba(6,200,150,.35); color: var(--accent); }
+  .toast.error   { border-color: rgba(239,68,68,.35);  color: var(--risk-high); }
+  @keyframes slideUp { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+
+  .no-data { text-align: center; padding: 28px; color: var(--text-muted); font-size: 12px; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .left-panel { border-right: none; border-bottom: 1px solid var(--border); }
+    .summary-grid { grid-template-columns: repeat(3, 1fr); }
+    .v-details { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+  /* Source / platform badges on video cards */
+  .source-badge {
+    display: inline-flex; align-items: center;
+    font-size: 9px; font-family: var(--font-mono); font-weight: 600;
+    padding: 1px 5px; border-radius: 3px;
+    border: 1px solid currentColor; opacity: .75; letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .source-yt    { color: #FF6B6B; background: rgba(255,0,0,.05); }
+  .source-rss   { color: #F59E0B; background: rgba(245,158,11,.05); }
+  .source-ddg   { color: #60A5FA; background: rgba(96,165,250,.05); }
+  .source-bing  { color: #818CF8; background: rgba(129,140,248,.05); }
+  .source-dm    { color: #4DD0C4; background: rgba(77,208,196,.05); }
+  .platform-badge {
+    display: inline-flex; align-items: center;
+    font-size: 9px; font-family: var(--font-mono); font-weight: 700;
+    padding: 1px 5px; border-radius: 3px; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .plat-dailymotion { background: rgba(77,208,196,.12); color: #4DD0C4; border: 1px solid rgba(77,208,196,.3); }
+  .plat-facebook    { background: rgba(66,103,178,.12);  color: #7B9FE0; border: 1px solid rgba(66,103,178,.3); }
+  .plat-tiktok      { background: rgba(0,242,234,.1);    color: #4DD0C4; border: 1px solid rgba(0,242,234,.25); }
+  .plat-vimeo       { background: rgba(26,183,234,.1);   color: #5BBCDD; border: 1px solid rgba(26,183,234,.25); }
+  .plat-youtube     { background: rgba(255,0,0,.08);     color: #FF6B6B; border: 1px solid rgba(255,0,0,.25); }
+
+  /* Confirmed Stolen DB button */
+  .btn-review-db {
+    width: 100%; padding: 8px; border-radius: var(--radius);
+    border: 1.5px solid rgba(6,200,150,.4); background: var(--accent-dim);
+    color: var(--accent); font-family: var(--font-display); font-weight: 700;
+    font-size: 11px; cursor: pointer; transition: opacity .15s; letter-spacing: .02em;
+  }
+  .btn-review-db:hover { opacity: .8; }
+  .btn-confirmed-db {
+    width: 100%; padding: 8px; border-radius: var(--radius);
+    border: 1.5px solid rgba(239,68,68,.4); background: var(--risk-high-bg);
+    color: var(--risk-high); font-family: var(--font-display); font-weight: 700;
+    font-size: 11px; cursor: pointer; transition: opacity .15s; letter-spacing: .02em;
+  }
+  .btn-confirmed-db:hover { opacity: .8; }
+  .btn-clear-db {
+    width: 100%; padding: 8px; border-radius: var(--radius);
+    border: 1.5px solid var(--border); background: transparent;
+    color: var(--text-muted); font-family: var(--font-display); font-weight: 600;
+    font-size: 11px; cursor: pointer; transition: all .15s; letter-spacing: .02em;
+  }
+  .btn-clear-db:hover { border-color: var(--risk-high); color: var(--risk-high); background: var(--risk-high-bg); }
+
+  /* Confirmed DB section in right panel */
+  .confirmed-db-section { display: flex; flex-direction: column; gap: 20px; }
+  .confirmed-show-block { display: flex; flex-direction: column; gap: 10px; }
+  .confirmed-show-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .confirmed-show-name {
+    font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--text);
+  }
+  .confirmed-show-count {
+    background: var(--risk-high-bg); color: var(--risk-high);
+    border: 1px solid rgba(239,68,68,.3); border-radius: var(--radius);
+    padding: 2px 8px; font-size: 10px; font-family: var(--font-display); font-weight: 700;
+  }
+  .rf-chip.active-confirmed {
+    background: var(--risk-high-bg); border-color: rgba(239,68,68,.5);
+    color: var(--risk-high); font-weight: 700;
+  }
+
+  /* Already-found panel */
+  .known-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+  }
+  .btn-remove-known {
+    padding: 4px 9px; border-radius: var(--radius); font-size: 10px; font-weight: 600;
+    border: 1.5px solid rgba(239,68,68,.35); color: var(--risk-high);
+    background: var(--risk-high-bg); cursor: pointer; font-family: var(--font-display);
+    transition: opacity .15s; white-space: nowrap;
+  }
+  .btn-remove-known:hover { opacity: .75; }
+  .btn-reset-all {
+    padding: 6px 12px; border-radius: var(--radius); font-size: 11px; font-weight: 700;
+    border: 1.5px solid rgba(239,68,68,.5); color: var(--risk-high);
+    background: var(--risk-high-bg); cursor: pointer; font-family: var(--font-display);
+    transition: opacity .15s;
+  }
+  .btn-reset-all:hover { opacity: .75; }
+  .known-tip {
+    font-size: 11px; color: var(--text-muted); padding: 8px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 12px; line-height: 1.5;
+  }
+</style>
+
+<header>
+  <a class="logo" href="#">
+    <span class="logo-mark">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 1L13 4V10L7 13L1 10V4L7 1Z" stroke="#0B0D12" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M7 5V9M5 7H9" stroke="#0B0D12" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </span>
+    CopyGuard
+  </a>
+  <div class="header-right">
+    <span class="api-status">
+      <span class="api-dot" id="apiDot"></span>
+      <span id="apiStatusText">checking…</span>
+    </span>
+    <button class="btn-ghost" onclick="toggleTheme()">Toggle theme</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Left -->
+  <div class="left-panel">
+
+    <!-- Mode tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tabFinder" onclick="switchTab('finder')">Find Stolen</button>
+      <button class="tab-btn" id="tabSingle" onclick="switchTab('single')">Scan video</button>
+      <button class="tab-btn" id="tabChannel" onclick="switchTab('channel')">My channel</button>
+    </div>
+
+    <!-- Find Stolen panel -->
+    <div id="panelFinder" style="display:flex;flex-direction:column;gap:14px">
+      <div class="finder-wrap">
+        <!-- Content type selector -->
+        <div class="finder-field">
+          <label class="finder-label">What type of content?</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+            <div class="type-box active" id="ctBoxTele" onclick="toggleContentType('teledrama')">
+              <span class="type-box-icon">🎬</span>
+              <span class="type-box-label">Teledrama</span>
+              <span class="type-box-sub">Episodes / serials</span>
+            </div>
+            <div class="type-box" id="ctBoxMusic" onclick="toggleContentType('music')">
+              <span class="type-box-icon">🎵</span>
+              <span class="type-box-label">Music Event</span>
+              <span class="type-box-sub">Concerts / performances</span>
+            </div>
+            <div class="type-box" id="ctBoxEvent" onclick="toggleContentType('event')">
+              <span class="type-box-icon">📺</span>
+              <span class="type-box-label">Live Event</span>
+              <span class="type-box-sub">Shows / award nights</span>
+            </div>
+            <div class="type-box" id="ctBoxOther" onclick="toggleContentType('other')">
+              <span class="type-box-icon">📁</span>
+              <span class="type-box-label">Other</span>
+              <span class="type-box-sub">Any content</span>
+            </div>
+          </div>
+        </div>
+        <div class="finder-field">
+          <label class="finder-label" id="finderQueryLabel">Teledrama / show name</label>
+          <!-- Primary keyword (shown as input, also becomes first tag on Add) -->
+          <input type="text" id="finderQuery" class="finder-input"
+            placeholder="e.g. Sihina Genena, Ahas Maliga…"
+            autocomplete="off" spellcheck="false">
+          <!-- Extra keyword tags -->
+          <div id="keywordTags" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;min-height:0"></div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input type="text" id="extraKeywordInput" class="finder-input" style="flex:1;font-size:11px"
+              placeholder="Add alternate keyword (e.g. Sinhala name, transliteration…)"
+              autocomplete="off" spellcheck="false">
+            <button onclick="addSearchKeyword()" class="btn-secondary" style="white-space:nowrap;padding:0 12px;font-size:12px">+ Add</button>
+          </div>
+          <span style="font-size:10px;color:var(--text-dim)">All keywords searched together — more keywords = wider scan</span>
+        </div>
+        <div class="finder-field">
+          <label class="finder-label">Your official YouTube channels <span style="font-weight:400;color:var(--text-dim)">(optional)</span></label>
+          <div id="officialChannelTags" style="display:flex;flex-wrap:wrap;gap:5px;min-height:28px;padding:4px 0 2px"></div>
+          <div style="display:flex;gap:6px;margin-top:5px">
+            <input type="text" id="finderOfficial" class="finder-input" style="flex:1;font-size:11px;font-family:var(--font-mono)"
+              placeholder="https://youtube.com/@YourChannel"
+              autocomplete="off" spellcheck="false">
+            <button id="addChannelBtn" class="btn-secondary" style="white-space:nowrap;padding:0 12px;font-size:12px" onclick="addOfficialChannel()">+ Add</button>
+          </div>
+          <span style="font-size:10px;color:var(--text-dim)">Videos from these channels will be marked as <strong>your content</strong> and excluded from stolen results</span>
+          <!-- hidden field sends comma list to search -->
+          <input type="hidden" id="finderOfficialList">
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:11px;color:var(--text-muted)">
+          <span class="plat-chip yt" style="font-size:10px">YouTube</span>
+          Searches YouTube for matching content <strong style="color:var(--text)">not published by your channel</strong>
+        </div>
+        <!-- Scan a specific stolen channel -->
+        <div style="border-top:1px solid var(--border);padding-top:12px">
+          <div class="finder-label" style="margin-bottom:6px">Scan a specific channel directly</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px">Paste a channel URL you suspect is stealing — scans their RSS feed for content matching your show name above</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="stolenChannelInput" class="finder-input" style="font-size:11px;font-family:var(--font-mono)"
+              placeholder="https://youtube.com/@ChannelName" autocomplete="off" spellcheck="false">
+            <button onclick="scanStolenChannel()" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;cursor:pointer;font-size:11px;color:var(--text-muted);white-space:nowrap;transition:all .15s" id="stolenChannelBtn"
+              onmouseover="this.style.borderColor='var(--border-light)';this.style.color='var(--text)'"
+              onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">
+              Scan →
+            </button>
+          </div>
+        </div>
+
+        <!-- Round indicator + search button -->
+        <div id="roundIndicator" style="display:none;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:11px;color:var(--text-muted)">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3V6L8 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <span id="roundIndicatorText">Round 1 complete</span>
+          <button id="roundKnownCount" onclick="viewAlreadyFound()" style="margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:2px 7px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'"></button>
+        </div>
+        <button class="search-btn" id="finderBtn" onclick="runFinder()">
+          Search for stolen content
+        </button>
+        <button class="search-btn" id="nextRoundBtn" onclick="runNextRound()" style="display:none;background:var(--surface-2);border:1.5px solid var(--accent);color:var(--accent)">
+          → Start Round <span id="nextRoundNum">2</span> (skip already found)
+        </button>
+        <div id="showHistoryWrap" hidden style="flex-direction:column;gap:6px">
+          <button class="btn-ghost" style="width:100%;font-size:11px" onclick="viewAllFindings()">
+            View all findings for this show →
+          </button>
+          <button class="btn-ghost" style="width:100%;font-size:11px;border-color:rgba(245,158,11,.4);color:var(--risk-med)" onclick="viewAlreadyFound()">
+            Already found — manage tracked videos
+          </button>
+        </div>
+        <!-- Add Stolen URL -->
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px">Found a stolen video? Report it</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="stolenUrlInput" class="finder-input" style="font-size:11px;flex:1"
+              placeholder="Paste YouTube URL…" autocomplete="off">
+            <button onclick="addStolenUrl()" style="padding:6px 10px;background:var(--risk-high-bg);border:1.5px solid rgba(239,68,68,.4);border-radius:var(--radius);color:var(--risk-high);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
+              + Add
+            </button>
+          </div>
+          <div style="font-size:9px;color:var(--text-dim);margin-top:4px">Saves as confirmed stolen · then scans that channel for more content</div>
+        </div>
+
+        <button class="btn-review-db" onclick="viewAllReviewed()">
+          📋 All Reviewed Content
+        </button>
+        <button class="btn-confirmed-db" onclick="viewConfirmedDB()">
+          🔴 Confirmed Stolen Database
+        </button>
+        <button class="btn-clear-db" onclick="clearEntireDatabase()">
+          🗑 Clear entire database
+        </button>
+      </div>
+    </div>
+
+    <!-- Single scan panel -->
+    <div id="panelSingle">
+      <div>
+        <p class="panel-label">Paste a link</p>
+        <div class="url-input-wrap">
+          <div class="url-row">
+            <input
+              type="text"
+              id="urlInput"
+              class="url-input"
+              placeholder="YouTube, Facebook, Instagram, TikTok…"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button class="url-btn" id="urlBtn" onclick="submitUrl()">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Scan
+            </button>
+          </div>
+          <div class="url-platforms">
+            <span class="plat-chip yt">YouTube</span>
+            <span class="plat-chip fb">Facebook</span>
+            <span class="plat-chip ig">Instagram</span>
+            <span class="plat-chip tt">TikTok</span>
+            <span class="plat-chip">Twitter/X</span>
+            <span class="plat-chip">Vimeo</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider-label">or upload a file</div>
+
+      <div>
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" multiple accept="video/*,audio/*">
+          <div class="drop-icon">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <path d="M10 13V4M10 4L7 7M10 4L13 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M3 14V16C3 16.5523 3.44772 17 4 17H16C16.5523 17 17 16.5523 17 16V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <p class="drop-title">Drop files to scan</p>
+          <p class="drop-sub">Checks every 30-second window for copyright</p>
+          <div class="drop-types">
+            <span class="type-chip">MP4</span><span class="type-chip">MOV</span>
+            <span class="type-chip">MKV</span><span class="type-chip">AVI</span>
+            <span class="type-chip">MP3</span><span class="type-chip">WAV</span>
+            <span class="type-chip">AAC</span><span class="type-chip">M4A</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="panel-label">Scan queue</p>
+        <div class="queue-list" id="queueList">
+          <div class="no-data" style="padding:16px 0">No scans yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Channel scan panel -->
+    <div id="panelChannel" style="display:none;display:flex;flex-direction:column;gap:14px">
+      <div class="channel-wrap">
+        <p class="panel-label">Scan your channel or playlist</p>
+        <p class="channel-desc">Paste your YouTube channel, playlist, or Facebook page URL. CopyGuard will auto-discover all videos and scan every one for copyright issues.</p>
+        <div class="url-row">
+          <input type="text" id="channelInput" class="url-input"
+            placeholder="https://youtube.com/@YourChannel/videos"
+            autocomplete="off" spellcheck="false">
+          <button class="url-btn" id="channelBtn" onclick="submitChannel()">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Scan
+          </button>
+        </div>
+        <div class="url-platforms">
+          <span class="plat-chip yt">YT Channel</span>
+          <span class="plat-chip yt">YT Playlist</span>
+          <span class="plat-chip fb">FB Page</span>
+        </div>
+        <div class="max-row">
+          <label for="maxVideos">Max videos:</label>
+          <input type="number" id="maxVideos" value="50" min="1" max="100">
+          <span style="font-size:10px;color:var(--text-dim)">(max 100)</span>
+        </div>
+      </div>
+
+      <div>
+        <p class="panel-label">Batch scans</p>
+        <div class="batch-list" id="batchList">
+          <div class="no-data" style="padding:12px 0">No batch scans yet.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right -->
+  <div class="right-panel" id="rightPanel">
+    <div class="empty-state">
+      <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+        <rect x="4" y="4" width="36" height="36" rx="6" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M14 22H30M22 14V30" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <p>Upload a file to see timestamp-level copyright analysis.</p>
+    </div>
+  </div>
+</div>
+
+<!-- History -->
+<div class="history-section">
+  <div class="history-header">
+    <span class="history-title">Scan history</span>
+    <div class="filter-row">
+      <button class="filter-chip" id="filterViolations" onclick="toggleViolationsFilter()">Violations only</button>
+      <button class="btn-ghost" onclick="loadHistory()">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:middle;margin-right:4px"><path d="M1 6C1 3.23858 3.23858 1 6 1C8.03051 1 9.78705 2.19168 10.6 3.9M11 6C11 8.76142 8.76142 11 6 11C3.96949 11 2.21295 9.80832 1.4 8.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M9 4H10.6V2.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 8H1.4V9.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+  <div class="history-table-wrap">
+    <table class="history-table">
+      <thead>
+        <tr><th>File</th><th>Type</th><th>Risk</th><th>Violations</th><th>Segments</th><th>Scanned</th></tr>
+      </thead>
+      <tbody id="historyBody">
+        <tr><td colspan="6" class="no-data">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tl-tooltip" id="tlTooltip"></div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+const API = 'http://localhost:8000';
+let activeScans = {};
+let selectedScanId = null;
+let allScans = [];
+
+// Theme
+function getTheme() { return localStorage.getItem('cg-theme') || 'system'; }
+function applyTheme(t) {
+  if (t === 'dark') document.documentElement.setAttribute('data-theme','dark');
+  else if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+  else document.documentElement.removeAttribute('data-theme');
+}
+function toggleTheme() {
+  const t = getTheme();
+  const next = t === 'dark' ? 'light' : t === 'light' ? 'system' : 'dark';
+  localStorage.setItem('cg-theme', next);
+  applyTheme(next);
+}
+applyTheme(getTheme());
+
+// Health
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(3000) });
+    const ok = r.ok;
+    document.getElementById('apiDot').className = 'api-dot ' + (ok ? 'online' : 'error');
+    document.getElementById('apiStatusText').textContent = ok ? 'API connected' : 'API error';
+  } catch {
+    document.getElementById('apiDot').className = 'api-dot error';
+    document.getElementById('apiStatusText').textContent = 'API offline';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 15000);
+
+// Toast
+function toast(msg, type='') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+// Helpers
+function fmtSize(b) {
+  if (!b) return '';
+  return b > 1048576 ? (b/1048576).toFixed(1)+' MB' : (b/1024).toFixed(0)+' KB';
+}
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso+(iso.endsWith('Z')?'':'Z')).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  catch { return iso; }
+}
+function riskBadge(r) {
+  if (!r || r==='unknown') return `<span class="risk-badge unknown"><span class="risk-dot"></span>Unknown</span>`;
+  const l = r==='medium'?'Medium':r==='high'?'High':'Low';
+  return `<span class="risk-badge ${r}"><span class="risk-dot"></span>${l}</span>`;
+}
+function ftBadge(t) { return `<span class="file-type-badge ${t}">${t}</span>`; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Drop zone
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+dropzone.addEventListener('dragover', e=>{ e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', ()=>dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e=>{ e.preventDefault(); dropzone.classList.remove('drag-over'); uploadFiles([...e.dataTransfer.files]); });
+fileInput.addEventListener('change', ()=>{ uploadFiles([...fileInput.files]); fileInput.value=''; });
+
+async function submitUrl() {
+  const input = document.getElementById('urlInput');
+  const btn = document.getElementById('urlBtn');
+  const url = input.value.trim();
+  if (!url) { toast('Paste a URL first', 'error'); return; }
+  if (!url.startsWith('http')) { toast('URL must start with http:// or https://', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Downloading…';
+
+  try {
+    const r = await fetch(`${API}/api/upload-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({ detail: 'Failed' }));
+      toast(e.detail || 'URL scan failed', 'error');
+      return;
+    }
+    const data = await r.json();
+    toast(`Downloading from ${data.platform}…`, 'success');
+    input.value = '';
+    addToQueue(data.scan_id, data.filename, data.file_type, 'scanning');
+    pollScan(data.scan_id);
+  } catch {
+    toast('Cannot reach API', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Scan`;
+  }
+}
+
+// Allow Enter key on URL input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('urlInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitUrl();
+  });
+});
+
+async function uploadFiles(files) { for (const f of files) await uploadSingle(f); }
+
+async function uploadSingle(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch(`${API}/api/upload`, { method:'POST', body:fd });
+    if (!r.ok) { const e=await r.json().catch(()=>({detail:'Upload failed'})); toast(e.detail||'Upload failed','error'); return; }
+    const data = await r.json();
+    toast(`Scanning: ${file.name}`, 'success');
+    addToQueue(data.scan_id, file.name, data.file_type, 'scanning');
+    pollScan(data.scan_id);
+  } catch { toast('Cannot reach API — is the server running at port 8000?','error'); }
+}
+
+function addToQueue(id, filename, file_type, status) {
+  activeScans[id] = { id, filename, file_type, status };
+  renderQueue();
+}
+
+function renderQueue() {
+  const list = document.getElementById('queueList');
+  const ids = Object.keys(activeScans).map(Number).sort((a,b)=>b-a);
+  if (!ids.length) { list.innerHTML = `<div class="no-data" style="padding:16px 0">No scans yet.</div>`; return; }
+  list.innerHTML = ids.map(id => {
+    const s = activeScans[id];
+    const isActive = id===selectedScanId;
+    const pfClass = s.status==='scanning'?'scanning':s.status==='completed'?'done':s.status==='error'?'error':'';
+    const badge = s.status==='scanning'
+      ? `<span class="risk-badge scanning"><span class="risk-dot"></span>Scanning</span>`
+      : riskBadge(s.risk_level);
+    return `<div class="queue-item ${isActive?'active':''}" onclick="selectScan(${id})">
+      <div class="queue-top"><span class="queue-filename">${esc(s.filename)}</span>${badge}</div>
+      <div class="queue-meta">${ftBadge(s.file_type)}${s.file_size?`<span>${fmtSize(s.file_size)}</span>`:''}</div>
+      <div class="progress-bar"><div class="progress-fill ${pfClass}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+async function pollScan(id) {
+  let attempts = 0;
+  const MAX_ATTEMPTS = 300; // 300 × 3s = 15 min max
+  const iv = setInterval(async () => {
+    attempts++;
+    if (attempts > MAX_ATTEMPTS) { clearInterval(iv); return; }
+    try {
+      const r = await fetch(`${API}/api/scan/${id}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      activeScans[id] = { ...activeScans[id], ...data };
+      renderQueue();
+      if (selectedScanId === id) renderDetail(data);
+      if (data.status === 'completed' || data.status === 'error') {
+        clearInterval(iv);
+        const v = data.results?.summary?.total_violations || 0;
+        toast(
+          data.status === 'completed'
+            ? `Done: ${data.filename} — ${v} violation${v !== 1 ? 's' : ''} found`
+            : `Error: ${data.filename}`,
+          data.status === 'completed' ? 'success' : 'error'
+        );
+        loadHistory();
+      }
+    } catch {}
+  }, 3000);
+}
+
+async function selectScan(id) {
+  selectedScanId = id;
+  renderQueue();
+  const cached = activeScans[id];
+  if (cached?.results) { renderDetail(cached); return; }
+  if (cached?.status==='scanning') { renderScanning(cached.filename); return; }
+  try {
+    const r = await fetch(`${API}/api/scan/${id}`);
+    const data = await r.json();
+    activeScans[id] = { ...activeScans[id], ...data };
+    renderDetail(data);
+  } catch { toast('Could not load scan','error'); }
+}
+
+function renderScanning(filename) {
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="scanning-state">
+      <div class="scan-ring"></div>
+      <div>
+        <p style="font-family:var(--font-display);font-weight:600;font-size:14px">${esc(filename)}</p>
+        <p class="scan-step">Scanning 30-second segments for copyright…</p>
+        <p class="scan-step" style="margin-top:2px">Fetching label & ISRC details from MusicBrainz…</p>
+      </div>
+    </div>`;
+}
+
+function renderDetail(scan) {
+  if (scan.status==='scanning') { renderScanning(scan.filename); return; }
+  const panel = document.getElementById('rightPanel');
+  if (scan.status==='error') {
+    panel.innerHTML = `
+      <div class="result-header">
+        <div><div class="result-title">${esc(scan.filename)}</div><div class="result-meta">${ftBadge(scan.file_type)}</div></div>
+        ${riskBadge('unknown')}
+      </div>
+      <div class="error-notice">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2"/><path d="M8 5V8M8 11H8.01" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Scan failed: ${esc(scan.results?.error||'Unknown error')}
+      </div>`;
+    return;
+  }
+
+  const res = scan.results||{};
+  const summary = res.summary||{};
+  const violations = summary.violations||[];
+  const audioSegs = res.audio_scan||[];
+  const totalSegs = summary.total_segments || audioSegs.length;
+  const flaggedSegs = summary.flagged_segments || audioSegs.filter(s=>s.detected).length;
+  const musicViolations = violations.filter(v=>v.type==='music');
+
+  panel.innerHTML = `
+    <div class="result-header">
+      <div>
+        <div class="result-title">${esc(scan.filename)}</div>
+        <div class="result-meta">
+          <span>${ftBadge(scan.file_type)}</span>
+          ${res.platform ? `<span style="font-family:var(--font-mono);font-size:10px;padding:2px 7px;border-radius:3px;background:var(--surface-3);color:var(--text-muted)">${esc(res.platform)}</span>` : ''}
+          ${res.source_url ? `<a href="${esc(res.source_url)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px;font-family:var(--font-mono)">Source ↗</a>` : ''}
+          ${res.uploader ? `<span>${esc(res.uploader)}</span>` : ''}
+          ${scan.file_size ? `<span>${fmtSize(scan.file_size)}</span>` : ''}
+          <span>${fmtTime(scan.scanned_at)}</span>
+        </div>
+      </div>
+      ${riskBadge(scan.risk_level)}
+    </div>
+
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="stat-label">Violations</div>
+        <div class="stat-value ${violations.length>0?'danger':'good'}">${violations.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Music hits</div>
+        <div class="stat-value ${musicViolations.length>0?'warn':'good'}">${musicViolations.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Segments</div>
+        <div class="stat-value">${flaggedSegs}<span style="font-size:14px;color:var(--text-muted);font-weight:400">/${totalSegs}</span></div>
+      </div>
+    </div>
+
+    ${audioSegs.length>0 ? renderTimeline(audioSegs) : ''}
+
+    ${violations.length>0 ? `
+    <div>
+      <div class="section-title">
+        Copyright violations
+        <span class="count-pill">${violations.length} found</span>
+      </div>
+      <div class="violation-list">${violations.map(renderViolationCard).join('')}</div>
+    </div>
+    ` : audioSegs.length>0 ? `
+    <div class="violation-list">
+      <div class="violation-card">
+        <div class="violation-header">
+          <div class="v-icon music" style="background:var(--risk-low-bg);color:var(--risk-low)">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 8L6.5 11.5L13 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div>
+            <div class="v-title" style="color:var(--risk-low)">No copyright violations detected</div>
+            <div class="v-subtitle">All ${totalSegs} segments checked — content appears clear.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
+    ${audioSegs.length>0 ? renderSegTable(audioSegs) : ''}
+  `;
+
+  attachTimelineHovers();
+}
+
+function renderTimeline(segs) {
+  if (!segs.length) return '';
+  const first = segs[0].start_fmt || '0:00';
+  const last = segs[segs.length-1].end_fmt || '';
+  const bars = segs.map((s,i) => {
+    const cls = s.detected ? 'hit' : s.error ? 'error' : 'clean';
+    const tip = s.detected
+      ? `${s.start_fmt}–${s.end_fmt}: ${esc(s.title||'')} by ${esc((s.artists||[]).join(', '))}`
+      : `${s.start_fmt}–${s.end_fmt}: Clear`;
+    return `<div class="tl-seg ${cls}" data-tip="${tip}" data-start="${s.start_fmt}" data-end="${s.end_fmt}"></div>`;
+  }).join('');
+
+  return `
+    <div>
+      <div class="section-title">Content timeline <span class="count-pill">${segs.length} × 30s segments</span></div>
+      <div class="timeline-wrap">
+        <div class="timeline-bar" id="timelineBar">${bars}</div>
+        <div class="timeline-labels"><span>${first}</span><span>${last}</span></div>
+        <div class="timeline-legend">
+          <span><span class="legend-dot" style="background:var(--risk-high)"></span>Copyright hit</span>
+          <span><span class="legend-dot" style="background:var(--risk-low-bg);border:1px solid var(--risk-low)"></span>Clean</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function attachTimelineHovers() {
+  const tip = document.getElementById('tlTooltip');
+  document.querySelectorAll('.tl-seg').forEach(el => {
+    el.addEventListener('mousemove', e => {
+      tip.style.display = 'block';
+      tip.textContent = el.dataset.tip;
+      tip.style.left = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 12) + 'px';
+      tip.style.top = (e.clientY - 40) + 'px';
+    });
+    el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  });
+}
+
+function renderViolationCard(v) {
+  if (v.type === 'image') {
+    return `
+      <div class="violation-card">
+        <div class="violation-header">
+          <div class="v-icon image">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.2"/><circle cx="5.5" cy="5.5" r="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 11L5 7.5L7.5 10L10 7.5L14.5 12" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+          </div>
+          <div>
+            <div class="v-title">Image found on ${esc(v.source||'rights-managed site')}</div>
+            <div class="v-subtitle">${esc(v.detail)}</div>
+          </div>
+          ${v.url?`<div class="timestamp-badge" style="border-color:rgba(251,146,60,.25);background:rgba(251,146,60,.1)">
+            <span style="font-family:var(--font-mono);font-size:12px;color:#FB923C"><a href="${esc(v.url)}" target="_blank" rel="noopener" style="color:#FB923C;text-decoration:none">View source ↗</a></span>
+          </div>`:''}
+        </div>
+      </div>`;
+  }
+
+  // Music violation
+  const hasTime = v.start_fmt && v.end_fmt;
+  const isrcs = (v.isrcs||[]).slice(0,2).join(', ') || '—';
+  return `
+    <div class="violation-card">
+      <div class="violation-header">
+        <div class="v-icon music">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M6 12V3L13 1V10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="4" cy="12" r="2" stroke="currentColor" stroke-width="1.2"/><circle cx="11" cy="10" r="2" stroke="currentColor" stroke-width="1.2"/></svg>
+        </div>
+        <div>
+          <div class="v-title">${esc(v.title||'Unknown track')}</div>
+          <div class="v-subtitle">${esc((v.artists||[]).join(', ')||'Unknown artist')}</div>
+        </div>
+        ${hasTime?`
+        <div class="timestamp-badge">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 5V8.5L10.5 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <div>
+            <div class="ts-label">Found at</div>
+            <div class="ts-value">${esc(v.start_fmt)} – ${esc(v.end_fmt)}</div>
+          </div>
+        </div>`:''}
+      </div>
+      <div class="v-details">
+        <div class="v-detail-cell">
+          <div class="vd-label">Track</div>
+          <div class="vd-value">${esc(v.title||'—')}</div>
+        </div>
+        <div class="v-detail-cell">
+          <div class="vd-label">Artist(s)</div>
+          <div class="vd-value">${esc((v.artists||[]).join(', ')||'—')}</div>
+        </div>
+        <div class="v-detail-cell">
+          <div class="vd-label">Album / Release</div>
+          <div class="vd-value ${!v.album?'empty':''}">${esc(v.album||'—')}</div>
+        </div>
+        <div class="v-detail-cell">
+          <div class="vd-label">Label</div>
+          <div class="vd-value ${!v.label?'empty':''}">${esc(v.label||'—')}</div>
+        </div>
+        <div class="v-detail-cell">
+          <div class="vd-label">Release date</div>
+          <div class="vd-value ${!v.release_date?'empty':''}">${esc(v.release_date||'—')}</div>
+        </div>
+        <div class="v-detail-cell">
+          <div class="vd-label">ISRC</div>
+          <div class="vd-value ${isrcs==='—'?'empty':''}">${esc(isrcs)}</div>
+        </div>
+        <div class="v-detail-cell">
+          <div class="vd-label">Match confidence</div>
+          <div class="vd-value">${v.score!=null?v.score+'%':'—'}</div>
+        </div>
+        <div class="v-detail-cell">
+          <div class="vd-label">Detected in</div>
+          <div class="vd-value">${hasTime?esc(v.start_fmt)+' – '+esc(v.end_fmt):'—'}</div>
+        </div>
+        <div class="v-detail-cell">
+          <div class="vd-label">MusicBrainz</div>
+          <div class="vd-value">${v.mb_url?`<a href="${esc(v.mb_url)}" target="_blank" rel="noopener">View entry ↗</a>`:'<span class="empty">—</span>'}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSegTable(segs) {
+  return `
+    <div>
+      <div class="section-title">All segments <span class="count-pill">${segs.length} scanned</span></div>
+      <div class="seg-table-wrap">
+        <div class="scroll">
+          <table class="seg-table">
+            <thead><tr><th>Timestamp</th><th>Status</th><th>Track</th><th>Artist</th><th>Label</th><th>ISRC</th><th>Confidence</th></tr></thead>
+            <tbody>
+              ${segs.map(s => `
+                <tr class="${s.detected?'hit-row':''}">
+                  <td class="seg-time ${s.detected?'hit':''}">${esc(s.start_fmt||'?')} – ${esc(s.end_fmt||'?')}</td>
+                  <td>${s.detected
+                    ?`<span class="risk-badge high"><span class="risk-dot"></span>Hit</span>`
+                    :`<span class="risk-badge low"><span class="risk-dot"></span>Clear</span>`
+                  }</td>
+                  <td>${esc(s.title||'—')}</td>
+                  <td>${esc((s.artists||[]).join(', ')||'—')}</td>
+                  <td>${esc(s.label||'—')}</td>
+                  <td>${esc((s.isrcs||[]).slice(0,1).join('')||'—')}</td>
+                  <td>${s.score!=null?s.score+'%':'—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+
+// History
+async function loadHistory() {
+  try {
+    const r = await fetch(`${API}/api/history`);
+    allScans = await r.json();
+    renderHistory();
+  } catch {
+    document.getElementById('historyBody').innerHTML = `<tr><td colspan="6" class="no-data">Could not load — is the API running?</td></tr>`;
+  }
+}
+
+function renderHistory() {
+  const body = document.getElementById('historyBody');
+  if (!allScans.length) { body.innerHTML = `<tr><td colspan="6" class="no-data">No scans yet.</td></tr>`; return; }
+  body.innerHTML = allScans.map(s => {
+    const v = s.results?.summary?.total_violations??0;
+    const segs = s.results?.summary?.total_segments??0;
+    const flagged = s.results?.summary?.flagged_segments??0;
+    return `<tr onclick="loadHistoryScan(${s.id})">
+      <td><span class="h-filename">${esc(s.filename)}</span></td>
+      <td>${ftBadge(s.file_type)}</td>
+      <td>${riskBadge(s.risk_level)}</td>
+      <td><span class="violations-count ${v>0?'has':'none'}">${v>0?`${v} violation${v!==1?'s':''}`:'Clear'}</span></td>
+      <td><span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">${flagged}/${segs}</span></td>
+      <td><span class="h-time">${fmtTime(s.scanned_at||s.created_at)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadHistoryScan(id) {
+  selectedScanId = id;
+  const found = allScans.find(s=>s.id===id);
+  if (found) {
+    activeScans[id] = { ...activeScans[id], ...found };
+    renderQueue();
+    renderDetail(found);
+    window.scrollTo({top:0,behavior:'smooth'});
+    return;
+  }
+  try {
+    const r = await fetch(`${API}/api/scan/${id}`);
+    const data = await r.json();
+    activeScans[id] = { ...activeScans[id], ...data };
+    renderQueue();
+    renderDetail(data);
+    window.scrollTo({top:0,behavior:'smooth'});
+  } catch { toast('Could not load scan','error'); }
+}
+
+loadHistory();
+
+// =====================================================================
+// TAB SWITCHING
+// =====================================================================
+let currentTab = 'finder';
+function switchTab(tab) {
+  currentTab = tab;
+  ['finder','single','channel'].forEach(t => {
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
+    const el = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (el) el.style.display = t === tab ? 'flex' : 'none';
+  });
+  if (tab === 'channel') loadBatches();
+  if (tab === 'finder') {
+    // Show finder results in right panel if we have them
+    if (lastFinderResults) renderFinderResults(lastFinderResults);
+    else showFinderEmpty();
+  }
+}
+// Initial state
+document.getElementById('panelFinder').style.display = 'flex';
+document.getElementById('panelSingle').style.display = 'none';
+document.getElementById('panelSingle').style.flexDirection = 'column';
+document.getElementById('panelSingle').style.gap = '20px';
+document.getElementById('panelChannel').style.display = 'none';
+showFinderEmpty();
+
+function showFinderEmpty() {
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="empty-state">
+      <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+        <circle cx="20" cy="20" r="14" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M30 30L40 40" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M15 20H25M20 15V25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <p>Enter a teledrama or show name to find channels that have stolen and reuploaded your content.</p>
+    </div>`;
+}
+
+// =====================================================================
+// STOLEN CONTENT FINDER
+// =====================================================================
+const selectedPlatform = 'youtube'; // YouTube-only search
+const selectedContentTypes = new Set(['teledrama']);
+let lastFinderResults = null;
+let finderFilter = 'review';
+
+function _reviewCounterHtml(toReviewN, stolenN, safeN) {
+  return `
+    <button class="rf-chip ${finderFilter==='review'?'active-stolen':''}" onclick="setFinderFilter('review')">
+      To Review (${toReviewN})
+    </button>
+    <button class="rf-chip ${finderFilter==='stolen'?'active-confirmed':''}" onclick="setFinderFilter('stolen')" style="color:var(--risk-high)">
+      🔴 Confirmed Stolen (${stolenN})
+    </button>
+    ${stolenN > 0 ? `<button onclick="exportStolenCSV()" title="Export confirmed stolen list to Excel"
+      style="padding:4px 10px;font-size:10px;font-weight:700;border-radius:var(--radius);cursor:pointer;background:rgba(16,185,129,.12);border:1.5px solid rgba(16,185,129,.35);color:#10b981;font-family:var(--font-body);white-space:nowrap;transition:opacity .15s"
+      onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
+      ↓ Export CSV
+    </button>` : ''}
+    <button class="rf-chip ${finderFilter==='safe'?'active-all':''}" onclick="setFinderFilter('safe')">
+      ✓ Not Stolen (${safeN})
+    </button>
+    <button class="rf-chip ${finderFilter==='channels'?'active-channels':''}" onclick="setFinderFilter('channels')" style="font-size:9px;opacity:.7">
+      By Channel
+    </button>
+    <button class="rf-chip ${finderFilter==='all'?'active-all':''}" onclick="setFinderFilter('all')" style="font-size:9px;opacity:.7">
+      All Others
+    </button>
+  `;
+}
+
+function exportStolenCSV() {
+  if (!lastFinderResults) return;
+  const showName = lastFinderResults.query || 'show';
+  const results  = lastFinderResults.results || [];
+
+  const stolen = results.filter(r =>
+    confirmCache[r.video_id] === true || r.confirmed === 1
+  );
+  if (!stolen.length) { toast('No confirmed stolen videos to export', 'error'); return; }
+
+  const csvEsc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const headers = ['Show', 'Title', 'Channel', 'Channel URL', 'Video URL', 'Views', 'Duration', 'Upload Date', 'Source'];
+  const rows = stolen.map(v => [
+    showName,
+    v.title || '',
+    v.channel || '',
+    v.channel_url || '',
+    v.url || `https://www.youtube.com/watch?v=${v.video_id}`,
+    v.views || '',
+    v.duration_fmt || '',
+    v.upload_date || '',
+    v.source || '',
+  ].map(csvEsc).join(','));
+
+  const csv = '﻿' + [headers.map(csvEsc).join(','), ...rows].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `${showName.replace(/[^a-z0-9]/gi, '_')}_stolen_${date}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  toast(`Exported ${stolen.length} videos to CSV`, 'success');
+}
+let activeFinderJobId = null;
+let currentRound = 0;          // 0 = not started, 1 = round 1 done, etc.
+let currentSearchQuery = '';   // track what's being searched for round continuity
+
+// Duration filter state (seconds; null = no limit)
+let durationMin = null;   // minimum duration in seconds
+let durationMax = null;   // maximum duration in seconds
+
+function setDurationPreset(minSec, maxSec, el) {
+  durationMin = minSec;
+  durationMax = maxSec;
+  // Sync custom inputs
+  document.getElementById('durMinInput').value = minSec != null ? Math.floor(minSec / 60) : '';
+  document.getElementById('durMaxInput').value = maxSec != null ? Math.floor(maxSec / 60) : '';
+  // Highlight active preset
+  document.querySelectorAll('.dur-preset').forEach(b => b.classList.remove('active-dur'));
+  if (el) el.classList.add('active-dur');
+  if (lastFinderResults) renderFinderResults(lastFinderResults);
+}
+
+function applyCustomDuration() {
+  const minVal = document.getElementById('durMinInput').value.trim();
+  const maxVal = document.getElementById('durMaxInput').value.trim();
+  durationMin = minVal !== '' ? parseFloat(minVal) * 60 : null;
+  durationMax = maxVal !== '' ? parseFloat(maxVal) * 60 : null;
+  document.querySelectorAll('.dur-preset').forEach(b => b.classList.remove('active-dur'));
+  if (lastFinderResults) renderFinderResults(lastFinderResults);
+}
+
+function applyDurationFilter(items) {
+  return items.filter(r => {
+    const d = r.duration;
+    if (d == null) return true; // keep unknown durations
+    if (durationMin != null && d < durationMin) return false;
+    if (durationMax != null && d > durationMax) return false;
+    return true;
+  });
+}
+
+// Per-video confirmation cache (video_id → true/false/null)
+const confirmCache = {};
+
+// ── Official channel manager ────────────────────────────────────────────────
+// ── Extra search keywords ─────────────────────────────────────────────────
+let extraKeywords = [];   // array of additional keyword strings
+
+function _renderKeywordTags() {
+  const wrap = document.getElementById('keywordTags');
+  if (!wrap) return;
+  if (!extraKeywords.length) { wrap.innerHTML = ''; wrap.style.minHeight = '0'; return; }
+  wrap.style.minHeight = '28px';
+  wrap.innerHTML = extraKeywords.map((kw, i) => `
+    <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;background:var(--surface-2);border:1px solid var(--accent);border-radius:12px;font-size:11px;color:var(--accent);font-family:var(--font-mono)">
+      ${esc(kw)}
+      <button onclick="removeSearchKeyword(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;line-height:1;padding:0;margin:0" title="Remove">×</button>
+    </span>`).join('');
+}
+
+function addSearchKeyword() {
+  const inp = document.getElementById('extraKeywordInput');
+  const kw = inp.value.trim();
+  if (!kw) return;
+  const primary = document.getElementById('finderQuery').value.trim();
+  if (kw === primary) { inp.value = ''; return; }   // already the main keyword
+  if (extraKeywords.includes(kw)) { inp.value = ''; return; }
+  extraKeywords.push(kw);
+  inp.value = '';
+  _renderKeywordTags();
+}
+
+function removeSearchKeyword(idx) {
+  extraKeywords.splice(idx, 1);
+  _renderKeywordTags();
+}
+// ─────────────────────────────────────────────────────────────────────────
+
+let officialChannels = [];   // array of URL strings
+
+function _saveChannels() {
+  try { localStorage.setItem('cg-official-channels', JSON.stringify(officialChannels)); } catch {}
+  // keep legacy key in sync for anything that still reads it
+  try { localStorage.setItem('cg-official-channel', officialChannels.join(',')); } catch {}
+  document.getElementById('finderOfficialList').value = officialChannels.join(',');
+}
+
+function _renderChannelTags() {
+  const wrap = document.getElementById('officialChannelTags');
+  if (!wrap) return;
+  if (officialChannels.length === 0) {
+    wrap.innerHTML = '<span style="font-size:10px;color:var(--text-dim);padding:2px 0">No channels added yet — videos from all channels will be shown as unknown</span>';
+    return;
+  }
+  wrap.innerHTML = officialChannels.map((url, i) => {
+    const label = url.replace(/^https?:\/\/(www\.)?youtube\.com\//,'').replace(/\/?$/,'');
+    return `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(6,200,150,.12);border:1px solid rgba(6,200,150,.3);border-radius:12px;padding:2px 8px;font-size:10px;color:var(--text);font-family:var(--font-mono)">
+      <span title="${esc(url)}">${esc(label)}</span>
+      <button onclick="removeOfficialChannel(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;padding:0;line-height:1" title="Remove">×</button>
+    </span>`;
+  }).join('');
+}
+
+function addOfficialChannel() {
+  const inp = document.getElementById('finderOfficial');
+  const raw = (inp.value || '').trim();
+  if (!raw) return;
+  // support pasting a comma list at once
+  const urls = raw.split(',').map(s => s.trim()).filter(Boolean);
+  let added = 0;
+  for (const url of urls) {
+    if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+      toast('Please enter a YouTube channel URL (youtube.com/…)', 'error'); continue;
+    }
+    if (!officialChannels.includes(url)) { officialChannels.push(url); added++; }
+  }
+  if (added) { _saveChannels(); _renderChannelTags(); inp.value = ''; }
+}
+
+function removeOfficialChannel(idx) {
+  officialChannels.splice(idx, 1);
+  _saveChannels();
+  _renderChannelTags();
+}
+
+// Press Enter in the URL input to add
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('finderOfficial');
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addOfficialChannel(); }});
+
+  // Restore from localStorage (support both old single-string and new array formats)
+  try {
+    const arr = JSON.parse(localStorage.getItem('cg-official-channels') || 'null');
+    if (Array.isArray(arr) && arr.length) {
+      officialChannels = arr;
+    } else {
+      // migrate from old comma-string format
+      const old = localStorage.getItem('cg-official-channel') || '';
+      if (old) officialChannels = old.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  } catch {}
+  _saveChannels();
+  _renderChannelTags();
+});
+
+const CONTENT_TYPE_META = {
+  teledrama: { label: 'Teledrama / show name', placeholder: 'e.g. Sihina Genena, Ahas Maliga…' },
+  music:     { label: 'Music event / concert name', placeholder: 'e.g. Derana Music Video Awards 2024…' },
+  event:     { label: 'Live event / show name', placeholder: 'e.g. Derana Dream Star, Hiru Super Dancer…' },
+  other:     { label: 'Content name', placeholder: 'Enter the name of your content…' },
+};
+
+function toggleContentType(type) {
+  const KEY = { teledrama:'Tele', music:'Music', event:'Event', other:'Other' };
+  if (selectedContentTypes.has(type)) {
+    // Don't allow deselecting the last one
+    if (selectedContentTypes.size === 1) return;
+    selectedContentTypes.delete(type);
+  } else {
+    selectedContentTypes.add(type);
+  }
+  // Sync visual state
+  Object.entries(KEY).forEach(([t, k]) => {
+    const box = document.getElementById('ctBox' + k);
+    if (box) box.classList.toggle('active', selectedContentTypes.has(t));
+  });
+  // Update label/placeholder — use first selected type if only one, else generic
+  const types = Array.from(selectedContentTypes);
+  const primary = types.length === 1 ? types[0] : null;
+  const meta = primary ? (CONTENT_TYPE_META[primary] || CONTENT_TYPE_META.other) : {
+    label: 'Content name',
+    placeholder: 'Enter the name of your content…',
+  };
+  const lbl = document.getElementById('finderQueryLabel');
+  const inp = document.getElementById('finderQuery');
+  if (lbl) lbl.textContent = meta.label;
+  if (inp) inp.placeholder = meta.placeholder;
+}
+
+
+// When the query field changes, reset round state (new show = new search)
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('finderQuery')?.addEventListener('input', () => {
+    const q = document.getElementById('finderQuery').value.trim();
+    if (q !== currentSearchQuery) {
+      currentRound = 0;
+      document.getElementById('nextRoundBtn').style.display = 'none';
+      document.getElementById('roundIndicator').style.display = 'none';
+    }
+  });
+});
+
+async function _startSearch(skipKnown) {
+  const query = document.getElementById('finderQuery').value.trim();
+  const official = document.getElementById('finderOfficialList').value.trim();
+  const btn = document.getElementById('finderBtn');
+  const nextBtn = document.getElementById('nextRoundBtn');
+
+  if (!query) { toast('Enter a show name to search', 'error'); return; }
+
+  // If this is a fresh search (new query or round 1), reset round + duration filter
+  if (!skipKnown) {
+    currentRound = 0;
+    currentSearchQuery = query;
+    durationMin = null;
+    durationMax = null;
+  }
+  currentRound++;
+
+  btn.disabled = true;
+  nextBtn.style.display = 'none';
+  document.getElementById('roundIndicator').style.display = 'none';
+  btn.textContent = currentRound === 1 ? 'Searching…' : `Running Round ${currentRound}…`;
+  finderFilter = 'review';
+  lastFinderResults = null;
+
+  const _shw = document.getElementById('showHistoryWrap'); _shw.hidden = false; _shw.style.display = 'flex';
+
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="scanning-state">
+      <div class="scan-ring"></div>
+      <div>
+        <p style="font-family:var(--font-display);font-weight:600;font-size:14px">Round ${currentRound} — Searching YouTube for "${esc(query)}"</p>
+        <p class="scan-step">${official ? 'Phase 1: Resolving channel ID + running search variations in parallel…' : 'Phase 1: Running search variations in parallel…'} (${Array.from(selectedContentTypes).join(', ')})</p>
+        <p class="scan-step" style="margin-top:2px">Phase 2: RSS scraping stolen channels · Phase 3: Bing + DDG web-index dorks · ${official ? 'Phase 4: Mirror-title search on official episodes' : ''}</p>
+        <p class="scan-step" style="margin-top:2px">${skipKnown ? 'Skipping previously found videos — new results only' : 'Fresh scan — all results included.'}</p>
+      </div>
+    </div>`;
+
+  try {
+    const r = await fetch(`${API}/api/find-stolen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        official_channel: official,
+        platform: selectedPlatform,
+        skip_known: skipKnown,
+        content_type: Array.from(selectedContentTypes).join(','),
+        extra_keywords: extraKeywords.filter(k => k !== query),
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast(data.detail || 'Search failed', 'error'); showFinderEmpty(); btn.disabled = false; btn.textContent = 'Search for stolen content'; return; }
+
+    activeFinderJobId = data.job_id;
+    pollFinderJob(data.job_id, data.queries_total);
+  } catch {
+    toast('Cannot reach API', 'error');
+    showFinderEmpty();
+    btn.disabled = false;
+    btn.textContent = 'Search for stolen content';
+    currentRound = Math.max(0, currentRound - 1);
+  }
+}
+
+// Round 1 — fresh search, ignore nothing
+async function runFinder() { await _startSearch(false); }
+
+// Round 2, 3, … — skip videos already found
+async function runNextRound() { await _startSearch(true); }
+
+// Directly scan a specific channel's RSS feed
+async function scanStolenChannel() {
+  const channelUrl = document.getElementById('stolenChannelInput').value.trim();
+  const query      = document.getElementById('finderQuery').value.trim();
+  const official   = document.getElementById('finderOfficialList').value.trim();
+  const btn        = document.getElementById('stolenChannelBtn');
+
+  if (!channelUrl) { toast('Paste a channel URL first', 'error'); return; }
+  if (!query)      { toast('Enter a show name above first', 'error'); return; }
+
+  btn.textContent = 'Scanning…';
+  btn.disabled = true;
+  toast(`Scanning channel for "${query}" content…`);
+
+  try {
+    const r = await fetch(`${API}/api/scan-stolen-channel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel_url: channelUrl, query, official_channel: official }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast(data.detail || 'Scan failed', 'error'); return; }
+
+    // Poll until done, then merge into current view
+    const iv = setInterval(async () => {
+      try {
+        const jr = await fetch(`${API}/api/find-stolen/${data.job_id}`);
+        const jd = await jr.json();
+        if (jd.status === 'completed') {
+          clearInterval(iv);
+          btn.textContent = 'Scan →';
+          btn.disabled = false;
+          const found = jd.total_found || 0;
+          const stolen = jd.stolen_count || 0;
+          toast(found > 0
+            ? `Channel scan done — ${stolen} related videos found (${found} total)`
+            : 'Channel scan done — no related content found',
+            found > 0 ? 'success' : ''
+          );
+          // Reload last finder results to reflect new data
+          if (lastFinderResults) {
+            const merged = await fetch(`${API}/api/find-stolen/${activeFinderJobId}`);
+            if (merged.ok) {
+              lastFinderResults = await merged.json();
+              renderFinderResults(lastFinderResults);
+            }
+          }
+        }
+      } catch {}
+    }, 2000);
+  } catch {
+    toast('Cannot reach API', 'error');
+    btn.textContent = 'Scan →';
+    btn.disabled = false;
+  }
+}
+
+async function viewAllFindings() {
+  const query = document.getElementById('finderQuery').value.trim();
+  if (!query) return;
+  try {
+    const r = await fetch(`${API}/api/known-stolen/${encodeURIComponent(query)}`);
+    const data = await r.json();
+    renderAllFindings(data);
+  } catch { toast('Could not load history', 'error'); }
+}
+
+function renderAllFindings(data) {
+  const panel = document.getElementById('rightPanel');
+  const videos = data.videos || [];
+  const stats = data.stats || {};
+  const shorts = videos.filter(v => v.is_short);
+
+  panel.innerHTML = `
+    <div class="results-header">
+      <div>
+        <div class="results-title">All findings — "${esc(data.show_name)}"</div>
+        <div class="results-meta">
+          ${stats.stolen||0} stolen videos found total · ${shorts.length} Shorts ·
+          first searched ${(stats.first_search||'').slice(0,10)} · last searched ${(stats.last_search||'').slice(0,10)}
+        </div>
+      </div>
+      <span class="stolen-badge-count">⚠ ${stats.stolen||0} total stolen</span>
+    </div>
+    ${videos.length === 0
+      ? `<div class="no-data" style="padding:32px;text-align:center">No stolen videos recorded yet for this show.</div>`
+      : `<div class="video-grid">${videos.map(v => renderVideoCard({...v, stolen: true, is_short: !!v.is_short}, data.show_name)).join('')}</div>`
+    }
+  `;
+}
+
+// =====================================================================
+// ALREADY FOUND — view + remove previously tracked videos
+// =====================================================================
+async function viewAlreadyFound() {
+  const query = document.getElementById('finderQuery').value.trim();
+  if (!query) { toast('Enter a show name first', 'error'); return; }
+  try {
+    const r = await fetch(`${API}/api/known-stolen-all/${encodeURIComponent(query)}`);
+    const data = await r.json();
+    renderAlreadyFound(data);
+  } catch { toast('Could not load tracked videos', 'error'); }
+}
+
+function renderAlreadyFound(data) {
+  const panel = document.getElementById('rightPanel');
+  const videos = data.videos || [];
+  const showName = data.show_name || '';
+  const stolen = videos.filter(v => v.stolen === 1);
+  const official = videos.filter(v => v.stolen === 0);
+  const unknown = videos.filter(v => v.stolen === null || v.stolen === undefined);
+
+  panel.innerHTML = `
+    <div class="known-panel-header">
+      <div>
+        <div class="results-title">Already found — "${esc(showName)}"</div>
+        <div class="results-meta">
+          ${videos.length} tracked videos total ·
+          ${stolen.length} stolen · ${official.length} official · ${unknown.length} unclassified
+        </div>
+      </div>
+      <button class="btn-reset-all" onclick="resetAllKnown(${JSON.stringify(showName)})">
+        🗑 Reset all
+      </button>
+    </div>
+    <div class="known-tip">
+      Videos listed here are <strong>skipped in new scans</strong> (skip-known mode).
+      Remove a video to make it resurface in the next search.
+      <strong>Reset all</strong> clears the entire history for this show — next scan starts fresh.
+    </div>
+    ${videos.length === 0
+      ? `<div class="no-data" style="padding:32px;text-align:center">No videos tracked yet for this show.</div>`
+      : `<div style="display:flex;flex-direction:column;gap:8px">
+          ${videos.map(v => renderKnownRow(v, showName)).join('')}
+        </div>`
+    }`;
+}
+
+function renderKnownRow(v, showName) {
+  const stolenLabel = v.stolen === 1
+    ? `<span class="stolen-flag">⚠ Stolen</span>`
+    : v.stolen === 0
+      ? `<span class="official-flag">✓ Official</span>`
+      : `<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--border);border-radius:3px;padding:2px 5px">? Unclassified</span>`;
+  const confirmedLabel = v.confirmed === 1
+    ? `<span class="stolen-flag" style="background:rgba(239,68,68,.18)">🔴 Confirmed</span>`
+    : '';
+  const srcLabel = { youtube_search:'YT Search', rss_scrape:'RSS Feed',
+                     duckduckgo_dork:'DDG Dork', bing_search:'Bing',
+                     dailymotion_api:'Dailymotion API' }[v.source] || (v.source || '');
+  const srcClass = { youtube_search:'source-yt', rss_scrape:'source-rss',
+                     duckduckgo_dork:'source-ddg', bing_search:'source-bing',
+                     dailymotion_api:'source-dm' }[v.source] || 'source-yt';
+
+  return `
+    <div class="batch-video-row" id="known-row-${esc(v.video_id)}" style="gap:10px;align-items:flex-start;padding:10px 13px">
+      ${v.thumbnail ? `<img src="${esc(v.thumbnail)}" style="width:80px;height:45px;object-fit:cover;border-radius:4px;flex-shrink:0;background:var(--surface-2)" loading="lazy" onerror="this.style.display='none'">` : ''}
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-display);font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">
+          <a href="${esc(v.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(v.title||'Untitled')}</a>
+        </div>
+        <div style="font-size:10px;font-family:var(--font-mono);color:var(--text-muted);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${esc(v.channel||'Unknown')} · found ${(v.first_found||'').slice(0,10)}
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${stolenLabel}${confirmedLabel}
+          ${srcLabel ? `<span class="source-badge ${srcClass}">${esc(srcLabel)}</span>` : ''}
+        </div>
+      </div>
+      <button class="btn-remove-known" onclick="removeFromKnown(${JSON.stringify(showName)},${JSON.stringify(v.video_id)})">
+        Remove
+      </button>
+    </div>`;
+}
+
+async function removeFromKnown(showName, videoId) {
+  try {
+    const r = await fetch(
+      `${API}/api/known-stolen/${encodeURIComponent(showName)}/${encodeURIComponent(videoId)}`,
+      { method: 'DELETE' }
+    );
+    if (r.ok) {
+      const row = document.getElementById(`known-row-${CSS.escape(videoId)}`);
+      if (row) { row.style.opacity = '.3'; row.style.pointerEvents = 'none'; }
+      toast('Removed — will resurface in the next scan', 'success');
+    }
+  } catch { toast('Could not remove video', 'error'); }
+}
+
+async function resetAllKnown(showName) {
+  if (!confirm(`Clear ALL tracked videos for "${showName}"? The next scan will be a completely fresh search.`)) return;
+  try {
+    const r = await fetch(
+      `${API}/api/known-stolen/${encodeURIComponent(showName)}`,
+      { method: 'DELETE' }
+    );
+    if (r.ok) {
+      toast(`All tracked videos cleared for "${showName}" — next scan is fresh`, 'success');
+      viewAlreadyFound();
+    }
+  } catch { toast('Could not reset', 'error'); }
+}
+
+async function clearEntireDatabase() {
+  const confirmed = confirm(
+    'CLEAR ENTIRE DATABASE?\n\n' +
+    'This will permanently delete:\n' +
+    '• All tracked videos (stolen + not stolen) for every show\n' +
+    '• All search job history\n\n' +
+    'Confirmed stolen records will also be wiped.\n' +
+    'This cannot be undone.'
+  );
+  if (!confirmed) return;
+  try {
+    const r = await fetch(`${API}/api/database/clear-all`, { method: 'DELETE' });
+    if (r.ok) {
+      const d = await r.json();
+      toast(`Database cleared — ${d.deleted_videos} videos removed`, 'success');
+      // Reset UI state
+      lastFinderResults = null;
+      activeFinderJobId = null;
+      currentRound = 0;
+      currentSearchQuery = '';
+      document.getElementById('rightPanel').innerHTML =
+        `<div class="no-data" style="padding:48px;text-align:center">Database cleared. Run a new search to start fresh.</div>`;
+      document.getElementById('showHistoryWrap').hidden = true;
+      document.getElementById('nextRoundBtn').style.display = 'none';
+      document.getElementById('roundIndicator').style.display = 'none';
+    } else {
+      toast('Failed to clear database', 'error');
+    }
+  } catch { toast('Cannot reach API', 'error'); }
+}
+
+// Add Stolen URL manually
+async function addStolenUrl() {
+  const urlInput = document.getElementById('stolenUrlInput');
+  const showInput = document.getElementById('finderQuery');
+  const url = urlInput.value.trim();
+  const showName = showInput ? showInput.value.trim() : '';
+
+  if (!url) { toast('Paste a YouTube URL first', 'error'); return; }
+  if (!showName) { toast('Enter a show name in the search box first', 'error'); return; }
+  if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+    toast('Only YouTube URLs are supported', 'error'); return;
+  }
+
+  const btn = document.querySelector('#stolenUrlInput + button') ||
+              document.querySelector('[onclick="addStolenUrl()"]');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  try {
+    const r = await fetch(`${API}/api/report-stolen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, show_name: showName })
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.detail || 'Failed to save', 'error'); return; }
+
+    urlInput.value = '';
+    const chan = d.channel ? ` from "${d.channel}"` : '';
+    const scanMsg = d.channel_scan_job_id
+      ? ' · scanning their channel in background'
+      : '';
+    toast(`Saved as stolen${chan}${scanMsg}`, 'success');
+  } catch { toast('Cannot reach API', 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = origText || '+ Add'; } }
+}
+
+// Confirmed Stolen Database
+async function viewConfirmedDB() {
+  const showName = document.getElementById('finderQuery').value.trim();
+  try {
+    const url = showName
+      ? `${API}/api/confirmed-stolen/${encodeURIComponent(showName)}`
+      : `${API}/api/confirmed-stolen`;
+    const r = await fetch(url);
+    const data = await r.json();
+    renderConfirmedDB(data, showName);
+  } catch { toast('Could not load confirmed stolen database', 'error'); }
+}
+
+function renderConfirmedDB(data, showName) {
+  const panel = document.getElementById('rightPanel');
+
+  // Normalise: single show returns {show_name, confirmed_count, videos}
+  // All shows returns [{show_name, confirmed_count, videos}, ...]
+  const groups = Array.isArray(data) ? data : [data];
+  const totalCount = groups.reduce((s, g) => s + (g.confirmed_count || 0), 0);
+
+  if (totalCount === 0) {
+    panel.innerHTML = `
+      <div class="results-header">
+        <div>
+          <div class="results-title">Confirmed Stolen Database${showName ? ` — "${esc(showName)}"` : ''}</div>
+          <div class="results-meta">No confirmed stolen videos yet.</div>
+        </div>
+      </div>
+      <div class="no-data" style="padding:48px;text-align:center;color:var(--text-muted)">
+        No videos have been confirmed as stolen yet.<br>
+        <span style="font-size:11px;color:var(--text-dim)">Use the ✓ Confirm stolen button on any suspected video to add it here.</span>
+      </div>`;
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="results-header">
+      <div>
+        <div class="results-title">Confirmed Stolen Database${showName ? ` — "${esc(showName)}"` : ''}</div>
+        <div class="results-meta">${totalCount} confirmed stolen video${totalCount !== 1 ? 's' : ''} across ${groups.length} show${groups.length !== 1 ? 's' : ''}</div>
+      </div>
+      <span class="stolen-badge-count">🔴 ${totalCount} Confirmed</span>
+    </div>
+    <div class="confirmed-db-section">
+      ${groups.filter(g => (g.videos||[]).length > 0).map(g => `
+        <div class="confirmed-show-block">
+          <div class="confirmed-show-header">
+            <span class="confirmed-show-name">${esc(g.show_name)}</span>
+            <span class="confirmed-show-count">🔴 ${g.confirmed_count} confirmed</span>
+          </div>
+          <div class="video-grid">
+            ${(g.videos||[]).map(v => renderVideoCard({
+              ...v,
+              stolen: true,
+              confirmed: 1,
+              is_short: !!v.is_short,
+              platform: v.platform || 'YouTube',
+              source: v.source || 'youtube_search',
+            }, g.show_name)).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+// ── All Reviewed Content ─────────────────────────────────────────────────────
+
+async function viewAllReviewed() {
+  const panel = document.getElementById('rightPanel');
+  panel.innerHTML = `<div class="scanning-state"><div class="scan-ring"></div><div><p style="font-family:var(--font-display);font-weight:600;font-size:14px">Loading review history…</p></div></div>`;
+  try {
+    const r = await fetch(`${API}/api/all-reviewed`);
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    renderAllReviewed(data);
+  } catch { toast('Could not load review history', 'error'); }
+}
+
+function renderAllReviewed(data) {
+  const panel = document.getElementById('rightPanel');
+  const { total_stolen, total_not_stolen, total_reviewed, shows } = data;
+
+  if (!total_reviewed) {
+    panel.innerHTML = `
+      <div class="results-header">
+        <div class="results-title">All Reviewed Content</div>
+        <div class="results-meta">No reviewed videos yet.</div>
+      </div>
+      <div class="no-data" style="padding:48px;text-align:center;color:var(--text-muted)">
+        You haven't marked any videos yet.<br>
+        <span style="font-size:11px;color:var(--text-dim)">Use ✓ Confirm stolen or ✗ Not stolen buttons during a scan.</span>
+      </div>`;
+    return;
+  }
+
+  const showsHtml = shows.map(g => {
+    const stolenRows = (g.stolen || []).map(v => _reviewRow(v, g.show_name, true)).join('');
+    const notStolenRows = (g.not_stolen || []).map(v => _reviewRow(v, g.show_name, false)).join('');
+    return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
+        <!-- Show header -->
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--border)">
+          <span style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--text)">${esc(g.show_name)}</span>
+          <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            ${g.stolen_count ? `<span style="font-size:10px;font-weight:700;color:var(--risk-high);background:var(--risk-high-bg);border:1px solid rgba(239,68,68,.3);border-radius:4px;padding:2px 7px">🔴 ${g.stolen_count} stolen</span>` : ''}
+            ${g.not_stolen_count ? `<span style="font-size:10px;font-weight:700;color:var(--text-muted);background:var(--surface-3);border:1px solid var(--border);border-radius:4px;padding:2px 7px">✓ ${g.not_stolen_count} not stolen</span>` : ''}
+          </span>
+        </div>
+        <!-- Stolen section -->
+        ${stolenRows ? `
+          <div style="padding:10px 14px 4px;font-size:10px;font-weight:700;color:var(--risk-high);letter-spacing:.06em;text-transform:uppercase">Confirmed Stolen</div>
+          <div style="display:flex;flex-direction:column;gap:0">${stolenRows}</div>` : ''}
+        <!-- Not stolen section -->
+        ${notStolenRows ? `
+          <div style="padding:10px 14px 4px;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase;${stolenRows?'border-top:1px solid var(--border)':''}">Confirmed Not Stolen</div>
+          <div style="display:flex;flex-direction:column;gap:0">${notStolenRows}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="results-header" style="margin-bottom:14px">
+      <div>
+        <div class="results-title">All Reviewed Content</div>
+        <div class="results-meta">${total_reviewed} videos reviewed across ${shows.length} show${shows.length!==1?'s':''}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:700;color:var(--risk-high);background:var(--risk-high-bg);border:1px solid rgba(239,68,68,.3);border-radius:5px;padding:4px 10px">🔴 ${total_stolen} Stolen</span>
+        <span style="font-size:11px;font-weight:700;color:var(--text-muted);background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:4px 10px">✓ ${total_not_stolen} Not Stolen</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">${showsHtml}</div>`;
+}
+
+function _reviewRow(v, showName, isStolen) {
+  const thumb = v.thumbnail
+    ? `<img src="${esc(v.thumbnail)}" style="width:80px;height:52px;object-fit:cover;border-radius:4px;flex-shrink:0;background:var(--surface-3)">`
+    : `<div style="width:80px;height:52px;background:var(--surface-3);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">${isStolen?'🔴':'✓'}</div>`;
+  const accent = isStolen ? 'var(--risk-high)' : 'var(--text-muted)';
+  const date = (v.first_found||'').split('T')[0] || (v.upload_date||'');
+  return `
+    <div style="display:flex;gap:10px;padding:8px 14px;border-top:1px solid var(--border);align-items:flex-start">
+      <a href="${esc(v.url||'')}" target="_blank" rel="noopener" style="flex-shrink:0">${thumb}</a>
+      <div style="flex:1;min-width:0">
+        <a href="${esc(v.url||'')}" target="_blank" rel="noopener"
+           style="font-size:12px;font-weight:600;color:var(--text);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+           title="${esc(v.title||'')}">${esc(v.title||'—')}</a>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${esc(v.channel||'Unknown channel')}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap">
+          <span style="font-size:9px;font-weight:700;color:${accent};background:${isStolen?'var(--risk-high-bg)':'var(--surface-3)'};border:1px solid ${isStolen?'rgba(239,68,68,.3)':'var(--border)'};border-radius:3px;padding:1px 5px">${isStolen?'🔴 Stolen':'✓ Not stolen'}</span>
+          ${date ? `<span style="font-size:9px;color:var(--text-dim)">Found ${date}</span>` : ''}
+          ${v.views_fmt && v.views_fmt !== '—' ? `<span style="font-size:9px;color:var(--text-dim)">${esc(v.views_fmt)} views</span>` : ''}
+          ${v.channel_url ? `<a href="${esc(v.channel_url)}" target="_blank" rel="noopener" style="font-size:9px;color:var(--text-dim);text-decoration:none;hover:color:var(--accent)">→ Channel</a>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function pollFinderJob(jobId, queriesTotal) {
+  const btn = document.getElementById('finderBtn');
+  const nextBtn = document.getElementById('nextRoundBtn');
+  const iv = setInterval(async () => {
+    try {
+      const r = await fetch(`${API}/api/find-stolen/${jobId}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      lastFinderResults = data;
+      renderFinderResults(data, queriesTotal);
+
+      if (data.status === 'completed') {
+        clearInterval(iv);
+        btn.disabled = false;
+        btn.textContent = 'New search (Round 1)';
+
+        // Show round indicator
+        const indicator = document.getElementById('roundIndicator');
+        const indicatorText = document.getElementById('roundIndicatorText');
+        const knownCount = document.getElementById('roundKnownCount');
+        indicator.style.display = 'flex';
+        indicatorText.textContent = `Round ${currentRound} complete — ${data.stolen_count} stolen found`;
+        knownCount.textContent = data.previously_known > 0 ? `${data.previously_known} already found ↗` : '';
+        knownCount.style.display = data.previously_known > 0 ? '' : 'none';
+
+        // Show "Next Round" button
+        document.getElementById('nextRoundNum').textContent = currentRound + 1;
+        nextBtn.style.display = 'block';
+
+        const _shw = document.getElementById('showHistoryWrap'); _shw.hidden = false; _shw.style.display = 'flex';
+
+        let msg = data.stolen_count > 0
+          ? `Round ${currentRound}: found ${data.stolen_count} suspected stolen videos out of ${data.total_found} total`
+          : `Round ${currentRound} complete — ${data.total_found} results checked, no stolen uploads found`;
+        if (data.previously_known > 0) {
+          msg += ` · ${data.previously_known} previously found skipped`;
+        }
+        toast(msg, data.stolen_count > 0 ? 'error' : 'success');
+      }
+    } catch {}
+  }, 2000);
+}
+
+function renderFinderResults(data, queriesTotal) {
+  const panel = document.getElementById('rightPanel');
+  const results = data.results || [];
+  const showName = data.query || '';
+  const isRunning = data.status === 'running';
+  const qDone = data.queries_done || 0;
+  const qTotal = queriesTotal || data.queries_total || 8;
+  const pct = qTotal > 0 ? Math.round((qDone / qTotal) * 100) : 0;
+
+  // Partition results — official channel (stolen===false) is NEVER shown to user for review
+  const official      = results.filter(r => r.stolen === false);
+  const nonOfficial   = results.filter(r => r.stolen !== false);  // everything else
+  const toReview      = nonOfficial.filter(r => {
+    const cv = confirmCache[r.video_id];
+    return cv == null && r.confirmed == null;
+  });
+  const confirmedStolen = nonOfficial.filter(r => confirmCache[r.video_id] === true || r.confirmed === 1);
+  const confirmedSafe   = nonOfficial.filter(r => confirmCache[r.video_id] === false || r.confirmed === 0);
+  const allStolenFlag   = results.filter(r => r.stolen === true);
+
+  // Pick which set to show based on finderFilter
+  let toShow;
+  if      (finderFilter === 'review')   toShow = toReview;
+  else if (finderFilter === 'stolen')   toShow = confirmedStolen;
+  else if (finderFilter === 'safe')     toShow = confirmedSafe;
+  else if (finderFilter === 'channels') toShow = allStolenFlag;
+  else if (finderFilter === 'all')      toShow = nonOfficial;
+  else { finderFilter = 'review'; toShow = toReview; }
+
+  // Apply duration filter
+  toShow = applyDurationFilter(toShow);
+
+  // Sort: most suspected-stolen first, then by views desc
+  if (finderFilter !== 'channels') {
+    toShow = [...toShow].sort((a, b) => {
+      const sa = a.stolen === true ? 0 : a.stolen === null ? 1 : 2;
+      const sb = b.stolen === true ? 0 : b.stolen === null ? 1 : 2;
+      if (sa !== sb) return sa - sb;
+      return (b.views || 0) - (a.views || 0);
+    });
+  }
+
+  const durFilterHtml = `
+    <div class="duration-filter-row">
+      <span class="dur-label">Duration:</span>
+      <button class="dur-preset${durationMin==null&&durationMax==null?' active-dur':''}" onclick="setDurationPreset(null,null,this)">Any</button>
+      <button class="dur-preset${durationMin==null&&durationMax===60?' active-dur':''}" onclick="setDurationPreset(null,60,this)">Shorts &lt;1 min</button>
+      <button class="dur-preset${durationMin===60&&durationMax===600?' active-dur':''}" onclick="setDurationPreset(60,600,this)">Clips 1–10 min</button>
+      <button class="dur-preset${durationMin===600&&durationMax===3600?' active-dur':''}" onclick="setDurationPreset(600,3600,this)">Episodes 10–60 min</button>
+      <button class="dur-preset${durationMin===3600&&durationMax==null?' active-dur':''}" onclick="setDurationPreset(3600,null,this)">Full 60 min+</button>
+      <span class="dur-sep">|</span>
+      <div class="dur-custom">
+        <span style="color:var(--text-dim)">Custom:</span>
+        <input id="durMinInput" class="dur-input" type="number" min="0" placeholder="min" title="Min minutes">
+        <span style="color:var(--text-dim)">–</span>
+        <input id="durMaxInput" class="dur-input" type="number" min="0" placeholder="max" title="Max minutes">
+        <span style="color:var(--text-dim)">min</span>
+        <button class="dur-apply" onclick="applyCustomDuration()">Apply</button>
+      </div>
+    </div>`;
+
+  const filterChips = `
+    <div class="result-filters" id="reviewCounterBar">
+      ${_reviewCounterHtml(toReview.length, confirmedStolen.length, confirmedSafe.length)}
+    </div>`;
+
+  let contentHtml;
+  if (finderFilter === 'channels') {
+    contentHtml = renderChannelsView(toShow, showName);
+  } else if (toShow.length === 0) {
+    const emptyMsg = finderFilter === 'review'
+      ? (isRunning ? 'Searching…' : nonOfficial.length === 0
+          ? 'No content from other channels found. Try different search terms or add your official channel.'
+          : 'All videos reviewed. Check "Confirmed Stolen" or "Not Stolen" tabs above.')
+      : 'No results for this filter.';
+    contentHtml = `<div class="no-data" style="padding:32px;text-align:center">${emptyMsg}</div>`;
+  } else {
+    contentHtml = `<div class="video-grid">${toShow.map(v => renderVideoCard(v, showName)).join('')}</div>`;
+  }
+
+  panel.innerHTML = `
+    <div class="results-header">
+      <div>
+        <div class="results-title">"${esc(showName)}" — Round ${currentRound}</div>
+        <div class="results-meta">
+          ${allStolenFlag.length} from other channels · ${official.length} official (hidden) · ${results.length} total found
+          ${isRunning ? `· <span style="color:var(--accent)">scanning ${qDone}/${qTotal}…</span>` : '· <span style="color:var(--risk-low)">scan complete</span>'}
+          ${(!isRunning && data.previously_known > 0) ? `· <span style="color:var(--text-muted)">${data.previously_known} already known, skipped</span>` : ''}
+        </div>
+      </div>
+      ${toReview.length > 0
+        ? `<span class="stolen-badge-count">${toReview.length} to review</span>`
+        : isRunning ? `<span style="font-size:12px;color:var(--text-muted)">Searching…</span>`
+        : confirmedStolen.length > 0
+          ? `<span class="stolen-badge-count" style="background:rgba(239,68,68,.18);color:var(--risk-high)">⚠ ${confirmedStolen.length} Confirmed Stolen</span>`
+          : `<span style="font-size:12px;color:var(--risk-low)">✓ All reviewed</span>`}
+    </div>
+
+    ${isRunning ? `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:7px">
+        <span>Running ${qTotal} search variations in parallel…</span><span>${pct}%</span>
+      </div>
+      <div style="height:5px;background:var(--border);border-radius:5px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:5px;transition:width .5s"></div>
+      </div>
+    </div>` : ''}
+
+    ${durFilterHtml}
+    ${filterChips}
+    ${contentHtml}
+  `;
+}
+
+function renderChannelsView(videos, showName) {
+  if (!videos.length) return `<div class="no-data" style="padding:32px;text-align:center">No stolen videos found yet.</div>`;
+
+  // Group by channel
+  const byChannel = {};
+  videos.forEach(v => {
+    const key = v.channel_id || v.channel || 'unknown';
+    if (!byChannel[key]) byChannel[key] = { channel: v.channel, channel_url: v.channel_url, videos: [], totalViews: 0 };
+    byChannel[key].videos.push(v);
+    byChannel[key].totalViews += v.views || 0;
+  });
+
+  // Sort by number of stolen videos desc
+  const channels = Object.values(byChannel).sort((a,b) => b.videos.length - a.videos.length);
+
+  return `<div style="display:flex;flex-direction:column;gap:10px">` +
+    channels.map((ch, i) => {
+      const shorts = ch.videos.filter(v => v.is_short).length;
+      const tele = ch.videos.length - shorts;
+      const viewsFmt = ch.totalViews >= 1e6 ? (ch.totalViews/1e6).toFixed(1)+'M'
+                     : ch.totalViews >= 1e3 ? (ch.totalViews/1e3).toFixed(1)+'K'
+                     : ch.totalViews || '—';
+      const collapseId = `ch-vids-${i}`;
+      return `
+        <div class="channel-card">
+          <div class="channel-card-header" onclick="toggleChannelCard('${collapseId}')">
+            <div class="channel-card-avatar">📺</div>
+            <div>
+              <div class="channel-card-name">
+                ${ch.channel_url
+                  ? `<a href="${esc(ch.channel_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(ch.channel)}</a>`
+                  : esc(ch.channel)}
+              </div>
+              <div class="channel-card-meta">
+                ${ch.videos.length} stolen uploads · ${tele} teledramas · ${shorts} Reels · ${viewsFmt} combined views
+              </div>
+            </div>
+            <div class="channel-card-badge">
+              <span class="stolen-flag">⚠ ${ch.videos.length}</span>
+            </div>
+          </div>
+          <div class="channel-card-videos hidden" id="${collapseId}">
+            ${ch.videos.map(v => renderVideoCard(v, showName, true)).join('')}
+          </div>
+        </div>`;
+    }).join('') + `</div>`;
+}
+
+function toggleChannelCard(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('hidden');
+}
+
+function setFinderFilter(f) {
+  finderFilter = f;
+  if (lastFinderResults) renderFinderResults(lastFinderResults);
+}
+
+// Delegated listener for confirm/dismiss buttons (avoids HTML attribute quoting issues)
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-cv-vid]');
+  if (!btn) return;
+  const val = btn.dataset.cvVal;
+  const confirmed = val === 'true' ? true : val === 'false' ? false : null;
+  confirmVideo(btn.dataset.cvShow, btn.dataset.cvVid, btn.dataset.cvUrl, confirmed);
+});
+
+async function confirmVideo(showName, videoId, videoUrl, confirmed) {
+  confirmCache[videoId] = confirmed;
+
+  // Persist into lastFinderResults immediately so counts update
+  if (lastFinderResults && lastFinderResults.results) {
+    const found = lastFinderResults.results.find(rv => rv.video_id === videoId);
+    if (found) found.confirmed = confirmed === true ? 1 : confirmed === false ? 0 : null;
+  }
+
+  // Animate the card out — user is done with it, move on to the next
+  const card = document.querySelector(`[data-vid="${CSS.escape(videoId)}"]`);
+  if (card && (confirmed === true || confirmed === false)) {
+    card.style.transition = 'opacity .25s ease, max-height .35s ease, margin-bottom .35s ease, padding .35s ease';
+    card.style.overflow = 'hidden';
+    card.style.maxHeight = card.offsetHeight + 'px';
+    requestAnimationFrame(() => {
+      card.style.opacity = '0';
+      card.style.maxHeight = '0';
+      card.style.marginBottom = '0';
+      card.style.padding = '0';
+    });
+    setTimeout(() => {
+      card.remove();
+      // Update the counter badge in the review header
+      _updateReviewCounter();
+    }, 380);
+  }
+
+  // Save to backend
+  try {
+    const r = await fetch(
+      `${API}/api/known-stolen/${encodeURIComponent(showName)}/${encodeURIComponent(videoId)}`,
+      {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ confirmed }),
+      }
+    );
+    if (r.ok) {
+      if (confirmed === true) {
+        toast('Saved as STOLEN', 'error');
+      } else if (confirmed === false) {
+        toast('Saved as NOT STOLEN', 'success');
+      } else {
+        toast('Reset to unreviewed');
+      }
+      // Refresh just the top-level counter chips without re-rendering all cards
+      _updateReviewCounter();
+    } else {
+      toast('Failed to save — check API connection', 'error');
+    }
+  } catch {
+    toast('Cannot reach API — saved locally only', 'error');
+  }
+}
+
+function _updateReviewCounter() {
+  if (!lastFinderResults) return;
+  const results = lastFinderResults.results || [];
+  const unreviewed = results.filter(r => r.stolen !== false && confirmCache[r.video_id] == null && r.confirmed == null);
+  const confirmedStolen = results.filter(r => confirmCache[r.video_id] === true || r.confirmed === 1);
+  const notStolen = results.filter(r => confirmCache[r.video_id] === false || r.confirmed === 0);
+  const el = document.getElementById('reviewCounterBar');
+  if (el) {
+    el.innerHTML = _reviewCounterHtml(unreviewed.length, confirmedStolen.length, notStolen.length);
+  }
+}
+
+function renderVideoCard(v, showName, compact) {
+  const isStolen = v.stolen === true;
+  const isOfficial = v.stolen === false;
+  const confirmed = confirmCache[v.video_id] ?? (v.confirmed === 1 ? true : v.confirmed === 0 ? false : null);
+  const cardClass = [
+    'video-card',
+    isStolen ? 'is-stolen' : '',
+    isOfficial ? 'is-official' : '',
+    confirmed === true ? 'is-confirmed-stolen' : '',
+    confirmed === false ? 'is-dismissed' : '',
+    compact ? 'compact' : '',
+  ].filter(Boolean).join(' ');
+
+  // Show confirm row for any video that isn't explicitly our own official channel.
+  const confirmRow = (v.stolen !== false) && showName ? `
+    <div class="confirm-row" style="margin-top:10px;gap:8px">
+      <button class="btn-confirm${confirmed===true?' selected':''}"
+        data-cv-show="${esc(showName)}" data-cv-vid="${esc(v.video_id)}" data-cv-url="${esc(v.url)}" data-cv-val="true"
+        style="flex:1;padding:8px 10px;font-size:12px;font-weight:700;border-radius:var(--radius);cursor:pointer;background:rgba(239,68,68,.12);border:1.5px solid rgba(239,68,68,.35);color:var(--risk-high);transition:background .15s"
+        onmouseover="this.style.background='rgba(239,68,68,.22)'" onmouseout="this.style.background='rgba(239,68,68,.12)'">
+        🔴 STOLEN
+      </button>
+      <button class="btn-dismiss${confirmed===false?' selected':''}"
+        data-cv-show="${esc(showName)}" data-cv-vid="${esc(v.video_id)}" data-cv-url="${esc(v.url)}" data-cv-val="false"
+        style="flex:1;padding:8px 10px;font-size:12px;font-weight:700;border-radius:var(--radius);cursor:pointer;background:rgba(34,197,94,.1);border:1.5px solid rgba(34,197,94,.3);color:var(--risk-low);transition:background .15s"
+        onmouseover="this.style.background='rgba(34,197,94,.2)'" onmouseout="this.style.background='rgba(34,197,94,.1)'">
+        ✓ NOT STOLEN
+      </button>
+    </div>` : '';
+
+  const platform = v.platform || 'YouTube';
+  const isYouTube = platform === 'YouTube';
+  const srcLabel = { youtube_search:'YT Search', rss_scrape:'RSS Feed',
+                     duckduckgo_dork:'DDG Dork', bing_search:'Bing',
+                     dailymotion_api:'Dailymotion API' }[v.source] || (v.source||'');
+  const srcClass = { youtube_search:'source-yt', rss_scrape:'source-rss',
+                     duckduckgo_dork:'source-ddg', bing_search:'source-bing',
+                     dailymotion_api:'source-dm' }[v.source] || 'source-yt';
+  const platBadge = !isYouTube ? `<span class="platform-badge plat-${platform.toLowerCase()}">${esc(platform)}</span>` : '';
+
+  return `
+    <div class="${cardClass}" data-vid="${esc(v.video_id)}">
+      ${v.thumbnail
+        ? `<img class="video-thumb" src="${esc(v.thumbnail)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+        : `<div class="video-thumb-placeholder"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="5" width="24" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M11 10L19 14L11 18V10Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></div>`
+      }
+      <div class="video-body">
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px">
+          ${v.is_short ? `<span class="short-badge">▶ Short / Reel</span>` : ''}
+          ${platBadge}
+          ${srcLabel ? `<span class="source-badge ${srcClass}">${esc(srcLabel)}</span>` : ''}
+          ${confirmed === true ? `<span class="stolen-flag" style="background:rgba(239,68,68,.18)">🔴 Confirmed stolen</span>`
+            : confirmed === false ? `<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--border);border-radius:3px;padding:2px 5px">✗ Not stolen</span>`
+            : isStolen ? `<span class="stolen-flag">⚠ Suspected stolen</span>`
+            : v.stolen === null ? `<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--border);border-radius:3px;padding:2px 5px">? Unverified</span>` : ''}
+          ${isOfficial ? `<span class="official-flag">✓ Your official channel</span>` : ''}
+        </div>
+        <div class="video-title">${esc(v.title)}</div>
+        <div class="video-channel">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M1 11C1 8.79086 3.23858 7 6 7C8.76142 7 11 8.79086 11 11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          ${v.channel_url
+            ? `<a href="${esc(v.channel_url)}" target="_blank" rel="noopener">${esc(v.channel||'Unknown channel')}</a>`
+            : esc(v.channel||'Unknown channel')
+          }
+        </div>
+        <div class="video-stats">
+          <span>${v.views_fmt||'—'} views</span>
+          <span>${v.duration_fmt||'—'}</span>
+          <span>${v.upload_date||'—'}</span>
+        </div>
+        <div class="video-actions">
+          <a class="v-act-btn" href="${esc(v.url)}" target="_blank" rel="noopener">Open video</a>
+          ${(isStolen || v.stolen === null) ? `<a class="v-act-btn report" href="${esc(v.url)}" target="_blank" rel="noopener" title="Open video to report copyright violation">Report</a>` : ''}
+        </div>
+        ${confirmRow}
+      </div>
+    </div>`;
+}
+
+
+// Enter key on finder inputs
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('finderQuery')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') runFinder();
+  });
+  document.getElementById('extraKeywordInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addSearchKeyword(); }
+  });
+});
+
+// =====================================================================
+// CHANNEL / BATCH SCANNING
+// =====================================================================
+let activeBatches = {};
+let selectedBatchId = null;
+
+async function submitChannel() {
+  const input = document.getElementById('channelInput');
+  const btn = document.getElementById('channelBtn');
+  const url = input.value.trim();
+  const maxVideos = parseInt(document.getElementById('maxVideos').value) || 50;
+
+  if (!url) { toast('Paste a channel URL first', 'error'); return; }
+  if (!url.startsWith('http')) { toast('URL must start with http:// or https://', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Extracting…';
+
+  try {
+    const r = await fetch(`${API}/api/scan-channel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, max_videos: maxVideos }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast(data.detail || 'Failed to start channel scan', 'error'); return; }
+
+    toast(`Found ${data.total_videos} videos on ${data.platform} — scanning all…`, 'success');
+    input.value = '';
+    activeBatches[data.batch_id] = { ...data };
+    renderBatchList();
+    pollBatch(data.batch_id);
+    selectBatch(data.batch_id);
+  } catch {
+    toast('Cannot reach API', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Scan`;
+  }
+}
+
+async function pollBatch(id) {
+  const iv = setInterval(async () => {
+    try {
+      const r = await fetch(`${API}/api/batch/${id}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      activeBatches[id] = data;
+      renderBatchList();
+      if (selectedBatchId === id) renderBatchDetail(data);
+      if (data.status === 'completed') {
+        clearInterval(iv);
+        toast(`Channel scan done — ${data.violations} violation${data.violations !== 1 ? 's' : ''} found across ${data.total} videos`, data.violations > 0 ? 'error' : 'success');
+        loadHistory();
+      }
+    } catch {}
+  }, 4000);
+}
+
+async function loadBatches() {
+  try {
+    const r = await fetch(`${API}/api/batches`);
+    const data = await r.json();
+    data.forEach(b => { if (!activeBatches[b.id]) activeBatches[b.id] = b; });
+    renderBatchList();
+  } catch {}
+}
+
+function renderBatchList() {
+  const list = document.getElementById('batchList');
+  const ids = Object.keys(activeBatches).map(Number).sort((a, b) => b - a);
+  if (!ids.length) { list.innerHTML = `<div class="no-data" style="padding:12px 0">No batch scans yet.</div>`; return; }
+  list.innerHTML = ids.map(id => {
+    const b = activeBatches[id];
+    const pct = b.total > 0 ? Math.round((b.completed / b.total) * 100) : 0;
+    const isActive = id === selectedBatchId;
+    const shortUrl = (b.channel_url || '').replace(/^https?:\/\/(www\.)?/, '').slice(0, 38);
+    return `<div class="batch-item ${isActive ? 'active' : ''}" onclick="selectBatch(${id})">
+      <div class="batch-top">
+        <span class="batch-name">${esc(shortUrl)}</span>
+        <span style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim)">${b.completed}/${b.total}</span>
+      </div>
+      <div class="batch-progress-bar"><div class="batch-progress-fill" style="width:${pct}%"></div></div>
+      <div class="batch-stats">
+        <span>${esc(b.platform || 'Web')}</span>
+        ${b.violations > 0 ? `<span class="batch-stat-vio">${b.violations} violation${b.violations !== 1 ? 's' : ''}</span>` : '<span>No violations yet</span>'}
+        <span style="margin-left:auto">${b.status === 'running' ? 'Scanning…' : 'Done'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function selectBatch(id) {
+  selectedBatchId = id;
+  renderBatchList();
+  try {
+    const r = await fetch(`${API}/api/batch/${id}`);
+    const data = await r.json();
+    activeBatches[id] = data;
+    renderBatchDetail(data);
+  } catch { toast('Could not load batch', 'error'); }
+}
+
+function renderBatchDetail(batch) {
+  const panel = document.getElementById('rightPanel');
+  const scans = batch.scans || [];
+  const pct = batch.total > 0 ? Math.round((batch.completed / batch.total) * 100) : 0;
+  const flagged = scans.filter(s => s.risk_level === 'high' || s.risk_level === 'medium');
+  const clear = scans.filter(s => s.risk_level === 'low');
+  const pending = scans.filter(s => s.status === 'scanning' || s.status === 'pending');
+
+  panel.innerHTML = `
+    <div class="result-header">
+      <div>
+        <div class="result-title">Channel Batch Scan</div>
+        <div class="result-meta">
+          <span style="font-family:var(--font-mono);font-size:10px;padding:2px 7px;border-radius:3px;background:var(--surface-3);color:var(--text-muted)">${esc(batch.platform||'Web')}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">${esc((batch.channel_url||'').slice(0,60))}</span>
+        </div>
+      </div>
+      <span class="risk-badge ${batch.violations > 0 ? 'high' : batch.status === 'running' ? 'scanning' : 'low'}">
+        <span class="risk-dot"></span>${batch.status === 'running' ? 'Scanning' : batch.violations > 0 ? 'Violations found' : 'All clear'}
+      </span>
+    </div>
+
+    <div class="batch-summary-grid">
+      <div class="stat-card"><div class="stat-label">Total videos</div><div class="stat-value">${batch.total}</div></div>
+      <div class="stat-card"><div class="stat-label">Scanned</div><div class="stat-value">${batch.completed}</div></div>
+      <div class="stat-card"><div class="stat-label">Violations</div><div class="stat-value ${batch.violations > 0 ? 'danger' : 'good'}">${batch.violations}</div></div>
+      <div class="stat-card"><div class="stat-label">Progress</div><div class="stat-value">${pct}<span style="font-size:14px;color:var(--text-muted);font-weight:400">%</span></div></div>
+    </div>
+
+    ${batch.status === 'running' ? `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:8px">
+        <span>Scanning ${pending.length} remaining videos…</span><span>${pct}%</span>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:6px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:6px;transition:width .4s"></div>
+      </div>
+    </div>` : ''}
+
+    ${flagged.length > 0 ? `
+    <div>
+      <div class="section-title" style="color:var(--risk-high)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 14H2L8 2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 7V9M8 11H8.01" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Flagged videos <span class="count-pill">${flagged.length}</span>
+      </div>
+      <div class="batch-video-list">
+        ${flagged.map(s => renderBatchVideoRow(s, true)).join('')}
+      </div>
+    </div>` : ''}
+
+    <div>
+      <div class="section-title">All videos <span class="count-pill">${scans.length}</span></div>
+      <div class="batch-video-list">
+        ${scans.map(s => renderBatchVideoRow(s, false)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderBatchVideoRow(scan, highlight) {
+  const violations = scan.results?.summary?.total_violations || 0;
+  const isFlagged = scan.risk_level === 'high' || scan.risk_level === 'medium';
+  const isScanning = scan.status === 'scanning' || scan.status === 'pending';
+  const name = scan.filename || 'Unknown';
+  return `<div class="batch-video-row ${isFlagged ? 'flagged' : ''}" onclick="loadHistoryScan(${scan.id})">
+    <span class="batch-video-title">${esc(name)}</span>
+    <span class="batch-video-status">
+      ${isScanning
+        ? `<span class="risk-badge scanning"><span class="risk-dot"></span>Scanning</span>`
+        : scan.status === 'error'
+          ? `<span class="risk-badge unknown"><span class="risk-dot"></span>Error</span>`
+          : riskBadge(scan.risk_level)
+      }
+    </span>
+    ${violations > 0 ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--risk-high)">${violations} issue${violations!==1?'s':''}</span>` : ''}
+  </div>`;
+}
+
+// Enter key for channel input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('channelInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitChannel();
+  });
+});
+loadBatches();
+
+// =====================================================================
+// VIOLATIONS FILTER
+// =====================================================================
+let showViolationsOnly = false;
+function toggleViolationsFilter() {
+  showViolationsOnly = !showViolationsOnly;
+  document.getElementById('filterViolations').classList.toggle('active', showViolationsOnly);
+  renderHistory();
+}
+
+const _origRenderHistory = renderHistory;
+renderHistory = function() {
+  const body = document.getElementById('historyBody');
+  let scans = allScans;
+  if (showViolationsOnly) {
+    scans = allScans.filter(s => (s.results?.summary?.total_violations || 0) > 0);
+  }
+  if (!scans.length) {
+    body.innerHTML = `<tr><td colspan="6" class="no-data">${showViolationsOnly ? 'No violations found in scan history.' : 'No scans yet.'}</td></tr>`;
+    return;
+  }
+  body.innerHTML = scans.map(s => {
+    const v = s.results?.summary?.total_violations ?? 0;
+    const segs = s.results?.summary?.total_segments ?? 0;
+    const flagged = s.results?.summary?.flagged_segments ?? 0;
+    return `<tr onclick="loadHistoryScan(${s.id})">
+      <td><span class="h-filename">${esc(s.filename)}</span></td>
+      <td>${ftBadge(s.file_type)}</td>
+      <td>${riskBadge(s.risk_level)}</td>
+      <td><span class="violations-count ${v>0?'has':'none'}">${v>0?`${v} violation${v!==1?'s':''}`:'Clear'}</span></td>
+      <td><span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">${flagged}/${segs}</span></td>
+      <td><span class="h-time">${fmtTime(s.scanned_at||s.created_at)}</span></td>
+    </tr>`;
+  }).join('');
+};
+</script>

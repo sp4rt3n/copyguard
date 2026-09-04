@@ -1,0 +1,11 @@
+backend/venv/
+backend/__pycache__/
+backend/*.db
+backend/uploads/
+backend/pattern_screenshots/
+backend/.env
+venv/
+**/__pycache__/
+**/*.pyc
+*.pdf
+.git/

@@ -1,0 +1,29 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Environment / secrets
+.env
+!.env.example
+
+# Database (persistent data — don't commit)
+*.db
+*.db-shm
+*.db-wal
+
+# Uploads & scan artifacts
+backend/uploads/
+backend/pattern_screenshots/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

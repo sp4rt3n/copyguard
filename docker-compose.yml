@@ -1,0 +1,16 @@
+services:
+  copyguard:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - copyguard_data:/app/data
+    environment:
+      - DB_PATH=/app/data/scans.db
+      - UPLOAD_DIR=/app/data/uploads
+      - ACOUSTID_API_KEY=${ACOUSTID_API_KEY:-}
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-500}
+    restart: unless-stopped
+
+volumes:
+  copyguard_data:
