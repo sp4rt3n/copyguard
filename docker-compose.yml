@@ -5,9 +5,11 @@ services:
     environment:
       POSTGRES_DB: copyguard
       POSTGRES_USER: copyguard
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-copyguard2024}
+      POSTGRES_PASSWORD: copyguard2024
     volumes:
       - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"        # exposed for local DB tools (e.g. DBeaver)
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U copyguard -d copyguard"]
@@ -21,20 +23,17 @@ services:
       - "8000"
     volumes:
       - copyguard_uploads:/app/data/uploads
+      - ./backend:/app/backend   # hot-reload: code changes reflect immediately
     env_file:
       - backend/.env
     environment:
-      - DATABASE_URL=postgresql://copyguard:${POSTGRES_PASSWORD:-copyguard2024}@db:5432/copyguard
+      - DATABASE_URL=postgresql://copyguard:copyguard2024@db:5432/copyguard
       - UPLOAD_DIR=/app/data/uploads
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   nginx:
     image: nginx:alpine
@@ -45,17 +44,6 @@ services:
     depends_on:
       - copyguard
     restart: unless-stopped
-
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - nginx
-    restart: unless-stopped
-    profiles:
-      - tunnel
 
 volumes:
   pg_data:
