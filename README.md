@@ -108,8 +108,8 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your_secure_password
 JWT_SECRET=change_this_to_a_random_secret
 JWT_EXPIRE_HOURS=24
-DB_PATH=/app/data/scans.db
-UPLOAD_DIR=/app/data/uploads
+POSTGRES_PASSWORD=your_secure_db_password
+UPLOAD_DIR=uploads
 ```
 
 ---

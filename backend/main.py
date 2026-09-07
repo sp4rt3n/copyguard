@@ -779,18 +779,20 @@ def set_confirmation(show_name: str, video_id: str, body: ConfirmRequest):
 @app.get("/api/admin/stats")
 def admin_stats(_: dict = Depends(require_admin)):
     """Aggregate stats for the admin dashboard."""
-    from database import get_conn, DB_PATH
-    import os as _os
+    from database import get_conn, _exec
     with get_conn() as conn:
-        videos = conn.execute("SELECT COUNT(*) as n FROM known_stolen_videos").fetchone()["n"]
-        confirmed_stolen = conn.execute("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed=1").fetchone()["n"]
-        confirmed_safe   = conn.execute("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed=0").fetchone()["n"]
-        unreviewed       = conn.execute("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed IS NULL AND stolen=1").fetchone()["n"]
-        shows            = conn.execute("SELECT COUNT(DISTINCT show_name) as n FROM known_stolen_videos").fetchone()["n"]
-        jobs_total       = conn.execute("SELECT COUNT(*) as n FROM search_jobs").fetchone()["n"]
-        jobs_running     = conn.execute("SELECT COUNT(*) as n FROM search_jobs WHERE status='running'").fetchone()["n"]
-        scans_total      = conn.execute("SELECT COUNT(*) as n FROM scans").fetchone()["n"]
-        top_shows        = conn.execute(
+        def _scalar(sql, p=()):
+            return _exec(conn, sql, p).fetchone()["n"]
+
+        videos           = _scalar("SELECT COUNT(*) as n FROM known_stolen_videos")
+        confirmed_stolen = _scalar("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed=1")
+        confirmed_safe   = _scalar("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed=0")
+        unreviewed       = _scalar("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed IS NULL AND stolen=1")
+        shows            = _scalar("SELECT COUNT(DISTINCT show_name) as n FROM known_stolen_videos")
+        jobs_total       = _scalar("SELECT COUNT(*) as n FROM search_jobs")
+        jobs_running     = _scalar("SELECT COUNT(*) as n FROM search_jobs WHERE status='running'")
+        scans_total      = _scalar("SELECT COUNT(*) as n FROM scans")
+        top_shows = _exec(conn,
             """SELECT show_name,
                       COUNT(*) as total,
                       SUM(CASE WHEN confirmed=1 THEN 1 ELSE 0 END) as stolen,
@@ -800,14 +802,17 @@ def admin_stats(_: dict = Depends(require_admin)):
                FROM known_stolen_videos
                GROUP BY show_name ORDER BY pending DESC, stolen DESC, total DESC LIMIT 20"""
         ).fetchall()
-        recent_jobs = conn.execute(
+        recent_jobs = _exec(conn,
             "SELECT id,query,status,total_found,stolen_count,created_at FROM search_jobs ORDER BY id DESC LIMIT 10"
         ).fetchall()
-        recent_scans = conn.execute(
+        recent_scans = _exec(conn,
             "SELECT id,filename,file_type,risk_level,status,scanned_at FROM scans ORDER BY id DESC LIMIT 10"
         ).fetchall()
+        db_size_row = _exec(conn,
+            "SELECT pg_size_pretty(pg_database_size(current_database())) as sz"
+        ).fetchone()
 
-    db_size_mb = round(_os.path.getsize(DB_PATH) / 1024 / 1024, 2) if _os.path.exists(DB_PATH) else 0
+    db_size_mb = db_size_row["sz"] if db_size_row else "—"
 
     return {
         "videos": videos,

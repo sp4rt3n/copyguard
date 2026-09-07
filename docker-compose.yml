@@ -1,16 +1,34 @@
 services:
 
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: copyguard
+      POSTGRES_USER: copyguard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-copyguard2024}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copyguard -d copyguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   copyguard:
     build: .
     expose:
       - "8000"
     volumes:
-      - copyguard_data:/app/data
+      - copyguard_uploads:/app/data/uploads
     env_file:
       - backend/.env
     environment:
-      - DB_PATH=/app/data/scans.db
+      - DATABASE_URL=postgresql://copyguard:${POSTGRES_PASSWORD:-copyguard2024}@db:5432/copyguard
       - UPLOAD_DIR=/app/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
@@ -37,7 +55,8 @@ services:
       - nginx
     restart: unless-stopped
     profiles:
-      - tunnel   # only starts when you run: docker compose --profile tunnel up
+      - tunnel
 
 volumes:
-  copyguard_data:
+  pg_data:
+  copyguard_uploads:
