@@ -212,9 +212,9 @@
         <div class="card-body">
           <table>
             <thead><tr>
-              <th>Show</th><th>Stolen</th><th>Not Stolen</th><th>Total</th><th>Last Activity</th>
+              <th>Show</th><th>Confirmed Stolen</th><th>Pending Review</th><th>Cleared</th><th>Total</th><th>Last Activity</th>
             </tr></thead>
-            <tbody id="showsTable"><tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Loading…</td></tr></tbody>
+            <tbody id="showsTable"><tr><td colspan="6" style="color:var(--text-dim);text-align:center;padding:20px">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -525,15 +525,16 @@ function renderStats(d) {
 function renderShows(shows) {
   document.getElementById('showCount').textContent = shows.length + ' shows';
   if (!shows.length) {
-    document.getElementById('showsTable').innerHTML = `<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">No shows yet</td></tr>`;
+    document.getElementById('showsTable').innerHTML = `<tr><td colspan="6" style="color:var(--text-dim);text-align:center;padding:20px">No shows yet</td></tr>`;
     return;
   }
   document.getElementById('showsTable').innerHTML = shows.map(s => `
     <tr>
       <td class="td-name">${esc(s.show_name)}</td>
-      <td><span class="badge badge-red">${s.stolen||0}</span></td>
-      <td><span class="badge badge-green">${s.safe||0}</span></td>
-      <td>${s.total||0}</td>
+      <td>${s.stolen ? `<span class="badge badge-red">${s.stolen}</span>` : `<span style="color:var(--text-dim)">0</span>`}</td>
+      <td>${(s.pending||0) ? `<span class="badge badge-yellow">${s.pending}</span>` : `<span style="color:var(--text-dim)">0</span>`}</td>
+      <td>${s.safe ? `<span class="badge badge-green">${s.safe}</span>` : `<span style="color:var(--text-dim)">0</span>`}</td>
+      <td style="color:var(--text)">${s.total||0}</td>
       <td class="td-mono">${fmtDate(s.last_activity)}</td>
     </tr>`).join('');
 }

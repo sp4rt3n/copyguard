@@ -760,7 +760,7 @@ async def report_stolen_url(body: ReportStolenRequest, background_tasks: Backgro
 
 
 @app.delete("/api/database/clear-all")
-def clear_entire_database():
+def clear_entire_database(_: dict = Depends(require_admin)):
     """Wipe all tracked videos and search jobs across every show."""
     deleted = clear_all_known_videos()
     return {"ok": True, "deleted_videos": deleted}
@@ -777,7 +777,7 @@ def set_confirmation(show_name: str, video_id: str, body: ConfirmRequest):
 # Admin endpoints
 # ---------------------------------------------------------------------------
 @app.get("/api/admin/stats")
-def admin_stats():
+def admin_stats(_: dict = Depends(require_admin)):
     """Aggregate stats for the admin dashboard."""
     from database import get_conn, DB_PATH
     import os as _os
@@ -795,9 +795,10 @@ def admin_stats():
                       COUNT(*) as total,
                       SUM(CASE WHEN confirmed=1 THEN 1 ELSE 0 END) as stolen,
                       SUM(CASE WHEN confirmed=0 THEN 1 ELSE 0 END) as safe,
+                      SUM(CASE WHEN stolen=1 AND confirmed IS NULL THEN 1 ELSE 0 END) as pending,
                       MAX(first_found) as last_activity
                FROM known_stolen_videos
-               GROUP BY show_name ORDER BY stolen DESC, total DESC LIMIT 20"""
+               GROUP BY show_name ORDER BY pending DESC, stolen DESC, total DESC LIMIT 20"""
         ).fetchall()
         recent_jobs = conn.execute(
             "SELECT id,query,status,total_found,stolen_count,created_at FROM search_jobs ORDER BY id DESC LIMIT 10"
