@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -76,6 +76,24 @@ def require_admin(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
     return payload
 
 # ---------------------------------------------------------------------------
+# Login rate limiter — max 10 attempts per IP per 5 minutes
+# ---------------------------------------------------------------------------
+import time, threading
+_login_attempts: dict[str, list[float]] = {}
+_login_lock = threading.Lock()
+_RATE_LIMIT_WINDOW = 300   # seconds
+_RATE_LIMIT_MAX    = 10
+
+def _check_rate_limit(ip: str):
+    now = time.monotonic()
+    with _login_lock:
+        attempts = [t for t in _login_attempts.get(ip, []) if now - t < _RATE_LIMIT_WINDOW]
+        if len(attempts) >= _RATE_LIMIT_MAX:
+            raise HTTPException(429, "Too many login attempts — try again in 5 minutes")
+        attempts.append(now)
+        _login_attempts[ip] = attempts
+
+# ---------------------------------------------------------------------------
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", str(Path(__file__).parent / "uploads")))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -84,7 +102,8 @@ MAX_FILE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 500))
 AUDIO_EXTS = {".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a"}
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".flv"}
 
-app = FastAPI(title="Copyright Detector API", version="1.0.0")
+app = FastAPI(title="Copyright Detector API", version="1.0.0",
+              docs_url=None, redoc_url=None, openapi_url=None)
 
 _ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
@@ -232,8 +251,9 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
     if size_mb > MAX_FILE_MB:
         raise HTTPException(413, f"File too large (max {MAX_FILE_MB}MB)")
 
-    scan_id = create_scan(file.filename, file_type, len(content))
-    save_path = UPLOAD_DIR / f"{scan_id}_{file.filename}"
+    safe_name = Path(file.filename).name.replace("..", "").strip() or "upload"
+    scan_id = create_scan(safe_name, file_type, len(content))
+    save_path = UPLOAD_DIR / f"{scan_id}_{safe_name}"
     with open(save_path, "wb") as f:
         f.write(content)
 
@@ -251,7 +271,7 @@ def get_scan_result(scan_id: int):
 
 @app.get("/api/history")
 def get_history(limit: int = 50):
-    return list_scans(limit)
+    return list_scans(min(limit, 500))
 
 
 class UrlRequest(BaseModel):
@@ -291,10 +311,10 @@ def _run_url_scan(scan_id: int, url: str, platform: str):
         filename = dl["filename"]
         file_size = Path(file_path).stat().st_size
 
-        from database import get_conn
+        from database import get_conn, _exec
         with get_conn() as conn:
-            conn.execute(
-                "UPDATE scans SET filename=?, file_size=? WHERE id=?",
+            _exec(conn,
+                "UPDATE scans SET filename=%s, file_size=%s WHERE id=%s",
                 (f"[{platform}] {filename[:80]}", file_size, scan_id),
             )
 
@@ -325,7 +345,9 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/api/login")
-def login(body: LoginRequest):
+def login(body: LoginRequest, request: Request):
+    ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown").split(",")[0].strip()
+    _check_rate_limit(ip)
     user = verify_user(body.username, body.password)
     if not user:
         raise HTTPException(401, "Invalid username or password")
@@ -391,10 +413,10 @@ def _run_batch_video_scan(scan_id: int, url: str, platform: str, batch_id: int):
         filename = dl.get("filename", "video")
         file_size = Path(file_path).stat().st_size
 
-        from database import get_conn
+        from database import get_conn, _exec
         with get_conn() as conn:
-            conn.execute(
-                "UPDATE scans SET filename=?, file_size=? WHERE id=?",
+            _exec(conn,
+                "UPDATE scans SET filename=%s, file_size=%s WHERE id=%s",
                 (f"[{platform}] {filename[:80]}", file_size, scan_id),
             )
 
@@ -428,7 +450,7 @@ def get_batch_result(batch_id: int):
 
 @app.get("/api/batches")
 def list_all_batches(limit: int = 20):
-    return list_batches(limit)
+    return list_batches(min(limit, 200))
 
 
 # ---------------------------------------------------------------------------
@@ -497,7 +519,7 @@ def get_stolen_job(job_id: int):
 
 @app.get("/api/find-stolen")
 def list_stolen_jobs(limit: int = 20):
-    return list_search_jobs(limit)
+    return list_search_jobs(min(limit, 200))
 
 
 @app.get("/api/known-stolen/{show_name}")
@@ -737,7 +759,8 @@ async def report_stolen_url(body: ReportStolenRequest, background_tasks: Backgro
             cid = meta["channel_id"] or resolve_channel_id(scan_channel_url)
             if not cid:
                 with get_conn() as conn:
-                    conn.execute("UPDATE search_jobs SET status='completed' WHERE id=?", (job_id,))
+                    from database import _exec as _db_exec
+                    _db_exec(conn, "UPDATE search_jobs SET status='completed' WHERE id=%s", (job_id,))
                 return
             rss = scrape_channel_rss(cid, set(), show_name)
             already = get_known_video_ids(show_name)

@@ -1,11 +1,42 @@
+import ipaddress
 import os
 import re
+import socket
 import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
+
+
+_PRIVATE_NETS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+]
+
+
+def _is_internal_ip(host: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(socket.gethostbyname(host))
+        return any(addr in net for net in _PRIVATE_NETS)
+    except Exception:
+        return True  # block on resolution failure
 
 
 def is_valid_url(url: str) -> bool:
-    return bool(re.match(r'https?://', url.strip()))
+    url = url.strip()
+    if not re.match(r'^https?://', url):
+        return False
+    try:
+        host = urlparse(url).hostname or ""
+        if not host:
+            return False
+        return not _is_internal_ip(host)
+    except Exception:
+        return False
 
 
 def platform_name(url: str) -> str:

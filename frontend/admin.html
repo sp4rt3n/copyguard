@@ -654,14 +654,14 @@ function renderUsers(users) {
       <td class="td-mono">${u.last_login ? fmtDate(u.last_login) : '<span style="color:var(--text-dim)">Never</span>'}</td>
       <td style="text-align:right">
         <div style="display:flex;gap:6px;justify-content:flex-end">
-          <button class="btn-sm" onclick="promptResetPassword(${u.id},'${esc(u.username)}')">Reset PW</button>
-          <select onchange="changeRole(${u.id},'${esc(u.username)}',this.value)"
+          <button class="btn-sm" data-action="reset-pw" data-uid="${u.id}" data-uname="${esc(u.username)}">Reset PW</button>
+          <select data-action="change-role" data-uid="${u.id}" data-uname="${esc(u.username)}"
             style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:3px 6px;font-size:11px;color:var(--text-muted);cursor:pointer">
             <option value="admin"    ${u.role==='admin'   ?'selected':''}>Admin</option>
             <option value="operator" ${u.role==='operator'?'selected':''}>Operator</option>
             <option value="viewer"   ${u.role==='viewer'  ?'selected':''}>Viewer</option>
           </select>
-          <button class="btn-sm btn-danger" onclick="removeUser(${u.id},'${esc(u.username)}')">Delete</button>
+          <button class="btn-sm btn-danger" data-action="delete-user" data-uid="${u.id}" data-uname="${esc(u.username)}">Delete</button>
         </div>
       </td>
     </tr>`).join('');
@@ -728,4 +728,21 @@ async function promptResetPassword(id, username) {
 
 // Enter key on login
 document.getElementById('lp').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// Event delegation for user table — avoids XSS via inline onclick with user-supplied data
+document.getElementById('usersTable').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const id    = parseInt(btn.dataset.uid, 10);
+  const uname = btn.dataset.uname;
+  if (btn.dataset.action === 'reset-pw')    promptResetPassword(id, uname);
+  if (btn.dataset.action === 'delete-user') removeUser(id, uname);
+});
+document.getElementById('usersTable').addEventListener('change', e => {
+  const sel = e.target.closest('select[data-action="change-role"]');
+  if (!sel) return;
+  const id    = parseInt(sel.dataset.uid, 10);
+  const uname = sel.dataset.uname;
+  changeRole(id, uname, sel.value);
+});
 </script>

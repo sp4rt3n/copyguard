@@ -25,6 +25,11 @@ RUN mkdir -p /app/data/uploads /app/data/screenshots
 # Create .env from example if not present — actual values injected via env vars
 COPY backend/.env.example ./backend/.env.example
 
+# Run as non-root user
+RUN useradd -r -s /bin/false appuser \
+    && chown -R appuser:appuser /app/data
+USER appuser
+
 WORKDIR /app/backend
 
 EXPOSE 8000
