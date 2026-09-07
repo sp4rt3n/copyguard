@@ -1411,6 +1411,27 @@ window.fetch = function(input, init = {}) {
   });
 };
 
+function _applyRoleUI(role) {
+  const adminBtn = document.getElementById('adminBtn');
+  if (adminBtn) { adminBtn.hidden = true; adminBtn.style.display = 'none'; }
+
+  const viewOnlyBadge = document.getElementById('viewOnlyBadge');
+  if (viewOnlyBadge) viewOnlyBadge.remove();
+
+  if (role === 'admin') {
+    if (adminBtn) { adminBtn.hidden = false; adminBtn.style.display = ''; }
+  } else if (role === 'viewer') {
+    document.querySelectorAll(
+      '#finderBtn, #nextRoundBtn, .search-btn, .btn-confirm, .btn-dismiss, #addChannelBtn, [onclick="addStolenUrl()"], [onclick="scanStolenChannel()"], [onclick="clearEntireDatabase()"], [onclick="addSearchKeyword()"]'
+    ).forEach(el => { el.disabled = true; el.title = 'View-only account'; el.style.opacity = '.4'; el.style.cursor = 'not-allowed'; });
+    const badge = document.createElement('span');
+    badge.id = 'viewOnlyBadge';
+    badge.textContent = 'VIEW ONLY';
+    badge.style.cssText = 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3);margin-right:4px';
+    document.querySelector('.header-right')?.prepend(badge);
+  }
+}
+
 async function doLogin() {
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
@@ -1428,6 +1449,7 @@ async function doLogin() {
     if (r.ok) {
       _setToken(d.token);
       showApp();
+      _applyRoleUI(d.role || 'viewer');
     } else {
       errEl.textContent = d.detail || 'Invalid credentials';
       errEl.style.display = 'block';
@@ -1441,6 +1463,11 @@ async function doLogin() {
 
 function doLogout() {
   _clearToken();
+  // Reset role-gated UI so the next login starts clean
+  const adminBtn = document.getElementById('adminBtn');
+  if (adminBtn) { adminBtn.hidden = true; adminBtn.style.display = 'none'; }
+  const badge = document.getElementById('viewOnlyBadge');
+  if (badge) badge.remove();
   showLogin();
 }
 
@@ -1466,23 +1493,8 @@ function showApp() {
     });
     if (r.ok) {
       const d = await r.json();
-      const role = d.role || 'viewer';
       showApp();
-      // Viewer = read-only: disable all action buttons
-      if (role === 'viewer') {
-        document.querySelectorAll(
-          '#finderBtn, #nextRoundBtn, .search-btn, .btn-confirm, .btn-dismiss, #addChannelBtn, [onclick="addStolenUrl()"], [onclick="scanStolenChannel()"], [onclick="clearEntireDatabase()"], [onclick="addSearchKeyword()"]'
-        ).forEach(el => { el.disabled = true; el.title = 'View-only account'; el.style.opacity = '.4'; el.style.cursor = 'not-allowed'; });
-        const badge = document.createElement('span');
-        badge.textContent = 'VIEW ONLY';
-        badge.style.cssText = 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3);margin-right:4px';
-        document.querySelector('.header-right')?.prepend(badge);
-      }
-      // Show Admin button only for admins — hidden by default in HTML
-      if (role === 'admin') {
-        const btn = document.getElementById('adminBtn');
-        if (btn) { btn.hidden = false; btn.style.display = ''; }
-      }
+      _applyRoleUI(d.role || 'viewer');
     } else { _clearToken(); showLogin(); }
   } catch { showLogin(); }
 })();
