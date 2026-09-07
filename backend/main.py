@@ -1,11 +1,15 @@
 import os
 import tempfile
+import secrets
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException, BackgroundTasks
+import jwt
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -28,6 +32,33 @@ from content_finder import build_search_queries, run_search_job
 
 load_dotenv()
 
+# ---------------------------------------------------------------------------
+# Auth config
+# ---------------------------------------------------------------------------
+ADMIN_USERNAME   = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD   = os.getenv("ADMIN_PASSWORD", "copyguard2024")
+JWT_SECRET       = os.getenv("JWT_SECRET", secrets.token_hex(32))
+JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", 24))
+JWT_ALGORITHM    = "HS256"
+
+_bearer = HTTPBearer(auto_error=False)
+
+def _make_token() -> str:
+    exp = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS)
+    return jwt.encode({"sub": ADMIN_USERNAME, "exp": exp}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def require_auth(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    token = creds.token if creds else None
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    try:
+        jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Session expired — please log in again")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+
+# ---------------------------------------------------------------------------
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", str(Path(__file__).parent / "uploads")))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -48,6 +79,33 @@ app.add_middleware(
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
     app.mount("/app", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+
+# Public API paths — no token needed
+_PUBLIC_PATHS = {"/api/login", "/api/health", "/api/auth/verify"}
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import JSONResponse
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        path = request.url.path
+        if path.startswith("/api/") and path not in _PUBLIC_PATHS:
+            auth = request.headers.get("Authorization", "")
+            token = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else ""
+            if not token:
+                return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+            try:
+                jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            except jwt.ExpiredSignatureError:
+                return JSONResponse({"detail": "Session expired — please log in again"}, status_code=401)
+            except jwt.InvalidTokenError:
+                return JSONResponse({"detail": "Invalid token"}, status_code=401)
+        return await call_next(request)
+
+app.add_middleware(AuthMiddleware)
 
 
 @app.get("/")
@@ -234,6 +292,25 @@ def _run_url_scan(scan_id: int, url: str, platform: str):
         import shutil
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
+
+# ---------------------------------------------------------------------------
+# Auth endpoints (public — no token required)
+# ---------------------------------------------------------------------------
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/login")
+def login(body: LoginRequest):
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
+        raise HTTPException(401, "Invalid username or password")
+    return {"token": _make_token(), "username": ADMIN_USERNAME}
+
+@app.get("/api/auth/verify")
+def verify_token(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    """Check if the current token is valid."""
+    require_auth(creds)
+    return {"ok": True}
 
 @app.get("/api/health")
 def health():

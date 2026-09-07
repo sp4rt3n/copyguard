@@ -1061,9 +1061,58 @@
       <span id="apiStatusText">checking…</span>
     </span>
     <button class="btn-ghost" onclick="toggleTheme()">Toggle theme</button>
+    <button class="btn-ghost" onclick="doLogout()" style="color:var(--risk-high);border-color:rgba(239,68,68,.3)" onmouseover="this.style.background='var(--risk-high-bg)'" onmouseout="this.style.background=''">Logout</button>
   </div>
 </header>
 
+<!-- ═══════════════════════════ LOGIN OVERLAY ═══════════════════════════ -->
+<div id="loginOverlay" style="
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+">
+  <div style="
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+    padding:40px 36px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:20px;
+    box-shadow:0 24px 60px rgba(0,0,0,.5);
+  ">
+    <div style="text-align:center">
+      <div style="font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.02em">CopyGuard</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Sign in to continue</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div>
+        <label style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:5px">Username</label>
+        <input id="loginUsername" type="text" autocomplete="username"
+          style="width:100%;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;font-size:13px;color:var(--text);outline:none;font-family:var(--font-body)"
+          placeholder="admin"
+          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:5px">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password"
+          style="width:100%;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;font-size:13px;color:var(--text);outline:none;font-family:var(--font-body)"
+          placeholder="••••••••"
+          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+    </div>
+
+    <div id="loginError" style="display:none;font-size:12px;color:var(--risk-high);background:var(--risk-high-bg);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius);padding:8px 12px;text-align:center"></div>
+
+    <button onclick="doLogin()" id="loginBtn"
+      style="width:100%;padding:11px;background:var(--accent);border:none;border-radius:var(--radius);color:#000;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:opacity .15s"
+      onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+      Sign In
+    </button>
+
+    <div style="text-align:center;font-size:10px;color:var(--text-dim)">Developed by Nipun Dinudaya</div>
+  </div>
+</div>
+<!-- ════════════════════════════════════════════════════════════════════ -->
+
+<div id="mainApp" style="display:none">
 <div class="layout">
   <!-- Left -->
   <div class="left-panel">
@@ -1336,6 +1385,89 @@
 <script>
 // Use relative URL so the app works behind Nginx/tunnel/any domain
 const API = '';
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+function _getToken() { try { return localStorage.getItem('cg-token') || ''; } catch { return ''; } }
+function _setToken(t) { try { localStorage.setItem('cg-token', t); } catch {} }
+function _clearToken() { try { localStorage.removeItem('cg-token'); } catch {} }
+
+// Patch fetch globally to always inject the auth token for /api/ calls
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(input, init = {}) {
+  const url = typeof input === 'string' ? input : (input.url || '');
+  if (url.startsWith('/api/') || url.includes(location.host + '/api/')) {
+    const token = _getToken();
+    if (token) {
+      init.headers = Object.assign({}, init.headers, { Authorization: 'Bearer ' + token });
+    }
+  }
+  return _origFetch(input, init).then(async r => {
+    if (r.status === 401 && !url.includes('/api/login')) {
+      _clearToken();
+      showLogin();
+    }
+    return r;
+  });
+};
+
+async function doLogin() {
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl    = document.getElementById('loginError');
+  const btn      = document.getElementById('loginBtn');
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const r = await _origFetch(`${API}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      _setToken(d.token);
+      showApp();
+    } else {
+      errEl.textContent = d.detail || 'Invalid credentials';
+      errEl.style.display = 'block';
+    }
+  } catch {
+    errEl.textContent = 'Cannot reach server — is it running?';
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false; btn.textContent = 'Sign In';
+}
+
+function doLogout() {
+  _clearToken();
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  setTimeout(() => document.getElementById('loginUsername').focus(), 100);
+}
+
+function showApp() {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  checkHealth();
+}
+
+// On load — verify existing token or show login
+(async function() {
+  const token = _getToken();
+  if (!token) { showLogin(); return; }
+  try {
+    const r = await _origFetch(`${API}/api/auth/verify`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (r.ok) { showApp(); } else { _clearToken(); showLogin(); }
+  } catch { showLogin(); }
+})();
+// ─────────────────────────────────────────────────────────────────────────
+
 let activeScans = {};
 let selectedScanId = null;
 let allScans = [];
@@ -3236,3 +3368,4 @@ renderHistory = function() {
 <footer style="text-align:center;padding:18px;font-size:11px;color:var(--text-dim);border-top:1px solid var(--border);margin-top:auto;font-family:var(--font-body)">
   Developed by <strong style="color:var(--text-muted)">Nipun Dinudaya</strong>
 </footer>
+</div><!-- /#mainApp -->
