@@ -75,6 +75,13 @@ def require_admin(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
         raise HTTPException(403, "Admin access required")
     return payload
 
+def require_operator(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    """Require admin or operator role (not viewer-only)."""
+    payload = require_auth(creds)
+    if payload.get("role") not in ("admin", "operator"):
+        raise HTTPException(403, "Operator or admin access required")
+    return payload
+
 # ---------------------------------------------------------------------------
 # Login rate limiter — max 10 attempts per IP per 5 minutes
 # ---------------------------------------------------------------------------
@@ -241,7 +248,7 @@ def _run_scan(scan_id: int, file_path: str, file_type: str):
 
 
 @app.post("/api/upload")
-async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...), _: dict = Depends(require_operator)):
     file_type = _classify_file(file.filename)
     if file_type == "unknown":
         raise HTTPException(400, "Unsupported file type — upload a video or audio file")
@@ -279,7 +286,7 @@ class UrlRequest(BaseModel):
 
 
 @app.post("/api/upload-url")
-async def upload_from_url(body: UrlRequest, background_tasks: BackgroundTasks):
+async def upload_from_url(body: UrlRequest, background_tasks: BackgroundTasks, _: dict = Depends(require_operator)):
     url = body.url.strip()
     if not is_valid_url(url):
         raise HTTPException(400, "Invalid URL — must start with http:// or https://")
@@ -346,7 +353,9 @@ class LoginRequest(BaseModel):
 
 @app.post("/api/login")
 def login(body: LoginRequest, request: Request):
-    ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown").split(",")[0].strip()
+    # Use X-Real-IP (set by nginx from $remote_addr) — not X-Forwarded-For which
+    # clients can spoof since nginx appends to whatever the client sends.
+    ip = request.headers.get("X-Real-IP") or (request.client.host if request.client else "unknown")
     _check_rate_limit(ip)
     user = verify_user(body.username, body.password)
     if not user:
@@ -373,7 +382,7 @@ class ChannelRequest(BaseModel):
 
 
 @app.post("/api/scan-channel")
-async def scan_channel(body: ChannelRequest, background_tasks: BackgroundTasks):
+async def scan_channel(body: ChannelRequest, background_tasks: BackgroundTasks, _: dict = Depends(require_operator)):
     url = body.url.strip()
     if not is_valid_url(url):
         raise HTTPException(400, "Invalid URL — must start with http:// or https://")
@@ -467,7 +476,7 @@ class StealSearchRequest(BaseModel):
 
 
 @app.post("/api/find-stolen")
-async def find_stolen(body: StealSearchRequest, background_tasks: BackgroundTasks):
+async def find_stolen(body: StealSearchRequest, background_tasks: BackgroundTasks, _: dict = Depends(require_operator)):
     query = body.query.strip()
     if not query:
         raise HTTPException(400, "Search query is required")
@@ -548,7 +557,7 @@ class ChannelScanRequest(BaseModel):
 
 
 @app.post("/api/scan-stolen-channel")
-async def scan_stolen_channel(body: ChannelScanRequest, background_tasks: BackgroundTasks):
+async def scan_stolen_channel(body: ChannelScanRequest, background_tasks: BackgroundTasks, _: dict = Depends(require_operator)):
     """Directly scan a specific channel's RSS feed and find videos related to a show."""
     from content_finder import resolve_channel_id, scrape_channel_rss
     from database import create_search_job, append_search_results, get_known_video_ids, save_known_videos
@@ -656,14 +665,14 @@ def all_known_for_show(show_name: str):
 
 
 @app.delete("/api/known-stolen/{show_name}/{video_id}")
-def remove_known_video(show_name: str, video_id: str):
+def remove_known_video(show_name: str, video_id: str, _: dict = Depends(require_operator)):
     """Remove a single video from the known list so it resurfaces on the next scan."""
     delete_known_video(show_name, video_id)
     return {"ok": True, "video_id": video_id}
 
 
 @app.delete("/api/known-stolen/{show_name}")
-def reset_known_for_show(show_name: str):
+def reset_known_for_show(show_name: str, _: dict = Depends(require_operator)):
     """Clear ALL tracked videos for a show — next scan will be a completely fresh start."""
     clear_known_videos(show_name)
     return {"ok": True, "show_name": show_name}
@@ -675,7 +684,7 @@ class ReportStolenRequest(BaseModel):
 
 
 @app.post("/api/report-stolen")
-async def report_stolen_url(body: ReportStolenRequest, background_tasks: BackgroundTasks):
+async def report_stolen_url(body: ReportStolenRequest, background_tasks: BackgroundTasks, _: dict = Depends(require_operator)):
     """User manually reports a stolen video URL.
     Fetches metadata via oEmbed, saves as confirmed stolen, then scans that channel."""
     import re, urllib.request
@@ -790,7 +799,7 @@ def clear_entire_database(_: dict = Depends(require_admin)):
 
 
 @app.patch("/api/known-stolen/{show_name}/{video_id}")
-def set_confirmation(show_name: str, video_id: str, body: ConfirmRequest):
+def set_confirmation(show_name: str, video_id: str, body: ConfirmRequest, _: dict = Depends(require_operator)):
     """Manually confirm or dismiss a suspected stolen video."""
     set_video_confirmed(show_name, video_id, body.confirmed)
     return {"ok": True, "video_id": video_id, "confirmed": body.confirmed}
@@ -860,6 +869,8 @@ def change_password(body: dict, _: dict = Depends(require_admin)):
     new_pass = (body.get("new_password") or "").strip()
     if len(new_pass) < 6:
         raise HTTPException(400, "Password must be at least 6 characters")
+    if '\n' in new_pass or '\r' in new_pass:
+        raise HTTPException(400, "Password must not contain newline characters")
     env_path = Path(__file__).parent / ".env"
     if env_path.exists():
         text = env_path.read_text()
