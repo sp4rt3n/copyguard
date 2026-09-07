@@ -78,36 +78,6 @@ The Admin Panel (`/admin`) gives the admin a full overview of the system:
 
 ---
 
-## How to Use — Step by Step
-
-### Running a Search
-
-1. Log in with your username and password
-2. Select the **content type** (Teledrama, Music Event, Live Event, or Other)
-3. Enter the **show name** (e.g. `Sihina Genena`, `Ahas Maliga`)
-4. Optionally add **alternate keywords** using the `+ Add` button — add Sinhala spellings, alternate names, or abbreviations
-5. Add your **official YouTube channel handles** (e.g. `@HiruTVOfficial`) so they get excluded from results
-6. Click **Find Stolen** — CopyGuard searches YouTube in parallel using all keyword combinations
-7. When results load, you are automatically in **Review Mode** — only unreviewed suspicious videos are shown
-
-### Reviewing Videos
-
-- Use the filter chips at the top to switch between: **To Review**, **Confirmed Stolen**, **Cleared**, **All**
-- Click **🔴 STOLEN** to mark a video as confirmed stolen — it moves to the Confirmed Stolen list
-- Click **✓ NOT STOLEN** to dismiss it — it moves to the Cleared list
-- Both actions animate the card away instantly without reloading the page
-- Click **Export CSV** to download the confirmed stolen list at any time
-
-### Reporting a Stolen URL
-
-1. Go to the **Find Stolen** tab
-2. Scroll to the **Report Stolen URL** section
-3. Paste the full YouTube URL of the stolen video
-4. Enter the show name it belongs to
-5. Click **Report** — CopyGuard saves it as confirmed stolen and automatically scans that uploader's channel
-
----
-
 ## Deployment (Docker)
 
 ### Prerequisites
