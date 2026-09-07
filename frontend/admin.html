@@ -1,0 +1,562 @@
+<title>CopyGuard Admin</title>
+<style>
+  :root {
+    --bg:#0B0D12; --surface:#141720; --surface-2:#1D2235; --surface-3:#242840;
+    --border:#252B3C; --border-light:#303650;
+    --text:#D8DFF0; --text-muted:#6B7590; --text-dim:#424C6A;
+    --accent:#06C896; --accent-dim:rgba(6,200,150,.12);
+    --risk-high:#EF4444; --risk-high-bg:rgba(239,68,68,.1);
+    --risk-med:#F59E0B; --risk-med-bg:rgba(245,158,11,.1);
+    --risk-low:#22C55E; --risk-low-bg:rgba(34,197,94,.1);
+    --font-display:'Syne',system-ui,sans-serif;
+    --font-body:'DM Sans',system-ui,sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+    --radius:6px; --radius-lg:10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font-body); font-size:14px; min-height:100vh; }
+
+  /* ── Login overlay ── */
+  #loginOverlay {
+    position:fixed; inset:0; z-index:9999; background:var(--bg);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .login-box {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+    padding:40px 36px; width:100%; max-width:380px; display:flex; flex-direction:column; gap:18px;
+    box-shadow:0 24px 60px rgba(0,0,0,.5);
+  }
+  .login-box h1 { font-family:var(--font-display); font-size:22px; font-weight:800; text-align:center; }
+  .login-box .sub { font-size:12px; color:var(--text-muted); text-align:center; }
+  .field label { font-size:10px; font-weight:700; color:var(--text-muted); letter-spacing:.05em; text-transform:uppercase; display:block; margin-bottom:5px; }
+  .field input {
+    width:100%; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius);
+    padding:9px 12px; font-size:13px; color:var(--text); outline:none; font-family:var(--font-body);
+    transition:border-color .15s;
+  }
+  .field input:focus { border-color:var(--accent); }
+  .btn-primary {
+    width:100%; padding:11px; background:var(--accent); border:none; border-radius:var(--radius);
+    color:#000; font-size:13px; font-weight:700; cursor:pointer; transition:opacity .15s;
+  }
+  .btn-primary:hover { opacity:.85; }
+  .err-box { display:none; font-size:12px; color:var(--risk-high); background:var(--risk-high-bg); border:1px solid rgba(239,68,68,.3); border-radius:var(--radius); padding:8px 12px; text-align:center; }
+
+  /* ── Layout ── */
+  #adminApp { display:none; }
+  header {
+    background:var(--surface); border-bottom:1px solid var(--border);
+    padding:0 28px; height:56px; display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:100;
+  }
+  .logo { font-family:var(--font-display); font-size:17px; font-weight:800; }
+  .logo span { color:var(--accent); }
+  .hdr-right { display:flex; align-items:center; gap:12px; font-size:12px; }
+  .hdr-pill { padding:3px 10px; border-radius:12px; background:var(--risk-high-bg); color:var(--risk-high); font-weight:700; font-size:10px; letter-spacing:.05em; }
+  .btn-sm {
+    padding:5px 12px; border-radius:var(--radius); border:1px solid var(--border);
+    background:var(--surface-2); color:var(--text-muted); font-size:12px; cursor:pointer; transition:all .15s;
+  }
+  .btn-sm:hover { border-color:var(--border-light); color:var(--text); }
+  .btn-danger { border-color:rgba(239,68,68,.35); color:var(--risk-high); }
+  .btn-danger:hover { background:var(--risk-high-bg); }
+
+  main { max-width:1200px; margin:0 auto; padding:28px 24px; display:flex; flex-direction:column; gap:28px; }
+
+  /* ── Stat tiles ── */
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+  .stat-tile {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+    padding:18px 20px; display:flex; flex-direction:column; gap:6px;
+  }
+  .stat-tile.accent  { border-color:rgba(6,200,150,.3); }
+  .stat-tile.danger  { border-color:rgba(239,68,68,.3); }
+  .stat-tile.warning { border-color:rgba(245,158,11,.3); }
+  .stat-tile.safe    { border-color:rgba(34,197,94,.25); }
+  .stat-label { font-size:10px; font-weight:700; color:var(--text-muted); letter-spacing:.05em; text-transform:uppercase; }
+  .stat-value { font-size:32px; font-weight:800; font-family:var(--font-display); line-height:1; }
+  .stat-tile.accent  .stat-value { color:var(--accent); }
+  .stat-tile.danger  .stat-value { color:var(--risk-high); }
+  .stat-tile.warning .stat-value { color:var(--risk-med); }
+  .stat-tile.safe    .stat-value { color:var(--risk-low); }
+  .stat-sub { font-size:11px; color:var(--text-dim); }
+
+  /* ── Cards ── */
+  .card {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;
+  }
+  .card-header {
+    padding:14px 20px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12px; font-weight:700; color:var(--text); letter-spacing:.02em;
+  }
+  .card-body { padding:0; }
+
+  /* ── Tables ── */
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { padding:10px 16px; text-align:left; font-size:10px; font-weight:700; color:var(--text-muted); letter-spacing:.05em; text-transform:uppercase; border-bottom:1px solid var(--border); }
+  td { padding:10px 16px; border-bottom:1px solid rgba(37,43,60,.5); color:var(--text-muted); }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:var(--surface-2); }
+  .td-name { color:var(--text); font-weight:600; }
+  .td-mono { font-family:var(--font-mono); font-size:11px; }
+
+  /* ── Badges ── */
+  .badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:700; }
+  .badge-red    { background:var(--risk-high-bg); color:var(--risk-high); border:1px solid rgba(239,68,68,.3); }
+  .badge-green  { background:var(--risk-low-bg);  color:var(--risk-low);  border:1px solid rgba(34,197,94,.3); }
+  .badge-yellow { background:var(--risk-med-bg);  color:var(--risk-med);  border:1px solid rgba(245,158,11,.3); }
+  .badge-gray   { background:var(--surface-2);    color:var(--text-muted); border:1px solid var(--border); }
+
+  /* ── Two column grid ── */
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:768px) { .two-col { grid-template-columns:1fr; } }
+
+  /* ── Settings panel ── */
+  .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:20px; }
+  @media(max-width:640px) { .settings-grid { grid-template-columns:1fr; } }
+  .settings-block { display:flex; flex-direction:column; gap:10px; }
+  .settings-block h3 { font-size:12px; font-weight:700; color:var(--text); margin-bottom:2px; }
+  .settings-block p { font-size:11px; color:var(--text-dim); line-height:1.5; }
+  .inp {
+    width:100%; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius);
+    padding:8px 12px; font-size:12px; color:var(--text); outline:none; font-family:var(--font-mono);
+    transition:border-color .15s;
+  }
+  .inp:focus { border-color:var(--accent); }
+  .action-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn-accent {
+    padding:7px 16px; border-radius:var(--radius); border:1.5px solid var(--accent);
+    background:var(--accent-dim); color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; transition:all .15s;
+  }
+  .btn-accent:hover { background:var(--accent); color:#000; }
+  .btn-red {
+    padding:7px 16px; border-radius:var(--radius); border:1.5px solid rgba(239,68,68,.4);
+    background:var(--risk-high-bg); color:var(--risk-high); font-size:12px; font-weight:700; cursor:pointer; transition:all .15s;
+  }
+  .btn-red:hover { background:rgba(239,68,68,.25); }
+
+  /* ── Status bar ── */
+  .status-bar {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:8px 16px; font-size:11px; color:var(--text-muted); font-family:var(--font-mono);
+    display:flex; align-items:center; gap:10px;
+  }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--text-dim); flex-shrink:0; }
+  .dot.online { background:var(--risk-low); box-shadow:0 0 6px var(--risk-low); }
+  .dot.error  { background:var(--risk-high); }
+
+  /* ── Toast ── */
+  .toast-wrap { position:fixed; bottom:20px; right:20px; display:flex; flex-direction:column; gap:8px; z-index:9999; }
+  .toast { padding:10px 16px; border-radius:var(--radius); font-size:12px; font-weight:600; animation:fadeIn .2s ease; }
+  .toast.ok  { background:var(--risk-low-bg);  color:var(--risk-low);  border:1px solid rgba(34,197,94,.4); }
+  .toast.err { background:var(--risk-high-bg); color:var(--risk-high); border:1px solid rgba(239,68,68,.4); }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+  footer { text-align:center; padding:20px; font-size:11px; color:var(--text-dim); border-top:1px solid var(--border); margin-top:8px; }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<!-- ═══ LOGIN ═══ -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div>
+      <h1>CopyGuard <span style="color:var(--accent)">Admin</span></h1>
+      <p class="sub" style="margin-top:4px">Sign in to manage the system</p>
+    </div>
+    <div class="field">
+      <label>Username</label>
+      <input id="lu" type="text" autocomplete="username" placeholder="admin">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input id="lp" type="password" autocomplete="current-password" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="err-box" id="lerr"></div>
+    <button class="btn-primary" id="lbtn" onclick="doLogin()">Sign In</button>
+    <div style="text-align:center;font-size:10px;color:var(--text-dim)">Developed by Nipun Dinudaya</div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="adminApp">
+  <header>
+    <div class="logo">CopyGuard <span>Admin</span></div>
+    <div class="hdr-right">
+      <div class="status-bar" style="padding:4px 12px">
+        <div class="dot" id="apiDot"></div>
+        <span id="apiTxt">checking…</span>
+      </div>
+      <span class="hdr-pill">ADMIN</span>
+      <button class="btn-sm" onclick="loadStats()">↻ Refresh</button>
+      <button class="btn-sm" onclick="location.href='/app/'">← App</button>
+      <button class="btn-sm btn-danger" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Stat tiles -->
+    <div class="stat-grid" id="statGrid">
+      <div class="stat-tile"><div class="stat-label">Loading…</div><div class="stat-value">—</div></div>
+    </div>
+
+    <!-- Shows + Recent Jobs -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">
+          Monitored Shows
+          <span id="showCount" style="color:var(--text-muted);font-weight:400"></span>
+        </div>
+        <div class="card-body">
+          <table>
+            <thead><tr>
+              <th>Show</th><th>Stolen</th><th>Not Stolen</th><th>Total</th><th>Last Activity</th>
+            </tr></thead>
+            <tbody id="showsTable"><tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Recent Search Jobs</div>
+        <div class="card-body">
+          <table>
+            <thead><tr>
+              <th>Show</th><th>Status</th><th>Found</th><th>Stolen</th><th>Date</th>
+            </tr></thead>
+            <tbody id="jobsTable"><tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent File Scans -->
+    <div class="card">
+      <div class="card-header">Recent File Scans (Audio / Video)</div>
+      <div class="card-body">
+        <table>
+          <thead><tr>
+            <th>File</th><th>Type</th><th>Risk</th><th>Status</th><th>Scanned</th>
+          </tr></thead>
+          <tbody id="scansTable"><tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="card">
+      <div class="card-header">Settings & Actions</div>
+      <div class="settings-grid">
+
+        <!-- Change password -->
+        <div class="settings-block">
+          <h3>Change Admin Password</h3>
+          <p>Updates the password in the server's .env file. Restart required to take effect.</p>
+          <input class="inp" id="newPw" type="password" placeholder="New password (min 6 chars)">
+          <input class="inp" id="confPw" type="password" placeholder="Confirm new password">
+          <div class="action-row">
+            <button class="btn-accent" onclick="changePassword()">Update Password</button>
+          </div>
+        </div>
+
+        <!-- Database actions -->
+        <div class="settings-block">
+          <h3>Database Management</h3>
+          <p>Export all confirmed stolen videos as CSV, or wipe the entire tracked video database.</p>
+          <div class="action-row">
+            <button class="btn-accent" onclick="exportAllStolen()">↓ Export All Stolen CSV</button>
+            <button class="btn-red"    onclick="clearDatabase()">🗑 Clear Entire Database</button>
+          </div>
+          <div id="dbInfo" style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)"></div>
+        </div>
+
+        <!-- System info -->
+        <div class="settings-block">
+          <h3>System Info</h3>
+          <p>Current runtime environment and quick links.</p>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:11px;font-family:var(--font-mono);color:var(--text-muted)" id="sysInfo">—</div>
+        </div>
+
+        <!-- Quick links -->
+        <div class="settings-block">
+          <h3>Quick Links</h3>
+          <p>Jump to key parts of the system.</p>
+          <div class="action-row">
+            <button class="btn-sm" onclick="location.href='/app/'">Main App</button>
+            <button class="btn-sm" onclick="location.href='/api/health'" target="_blank">API Health</button>
+            <button class="btn-sm" onclick="location.href='/docs'">API Docs</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <footer>Developed by <strong style="color:var(--text-muted)">Nipun Dinudaya</strong> &nbsp;·&nbsp; CopyGuard Admin Panel</footer>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+const API = '';
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+function _tok() { try { return localStorage.getItem('cg-token')||''; } catch { return ''; } }
+function _setTok(t) { try { localStorage.setItem('cg-token',t); } catch {} }
+function _clearTok() { try { localStorage.removeItem('cg-token'); } catch {} }
+
+const _origFetch = window.fetch.bind(window);
+window.fetch = (input, init={}) => {
+  const url = typeof input==='string' ? input : (input.url||'');
+  if ((url.startsWith('/api/') || url.includes(location.host+'/api/')) && !url.includes('/api/login')) {
+    const t = _tok();
+    if (t) init.headers = Object.assign({}, init.headers, {Authorization:'Bearer '+t});
+  }
+  return _origFetch(input, init).then(async r => {
+    if (r.status===401 && !url.includes('/api/login')) { _clearTok(); showLogin(); }
+    return r;
+  });
+};
+
+async function doLogin() {
+  const u = document.getElementById('lu').value.trim();
+  const p = document.getElementById('lp').value;
+  const errEl = document.getElementById('lerr');
+  const btn   = document.getElementById('lbtn');
+  errEl.style.display='none';
+  btn.disabled=true; btn.textContent='Signing in…';
+  try {
+    const r = await _origFetch(`${API}/api/login`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:u, password:p})
+    });
+    const d = await r.json();
+    if (r.ok) { _setTok(d.token); showApp(); }
+    else { errEl.textContent=d.detail||'Invalid credentials'; errEl.style.display='block'; }
+  } catch { errEl.textContent='Cannot reach server'; errEl.style.display='block'; }
+  btn.disabled=false; btn.textContent='Sign In';
+}
+
+function doLogout() { _clearTok(); showLogin(); }
+function showLogin() {
+  document.getElementById('loginOverlay').style.display='flex';
+  document.getElementById('adminApp').style.display='none';
+  setTimeout(()=>document.getElementById('lu').focus(), 100);
+}
+function showApp() {
+  document.getElementById('loginOverlay').style.display='none';
+  document.getElementById('adminApp').style.display='block';
+  loadStats(); checkHealth();
+}
+
+(async()=>{
+  const t = _tok();
+  if (!t) { showLogin(); return; }
+  try {
+    const r = await _origFetch(`${API}/api/auth/verify`,{headers:{Authorization:'Bearer '+t}});
+    if (r.ok) showApp(); else { _clearTok(); showLogin(); }
+  } catch { showLogin(); }
+})();
+
+// ── Health ────────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/api/health`,{signal:AbortSignal.timeout(3000)});
+    document.getElementById('apiDot').className = 'dot '+(r.ok?'online':'error');
+    document.getElementById('apiTxt').textContent = r.ok?'API online':'API error';
+  } catch {
+    document.getElementById('apiDot').className = 'dot error';
+    document.getElementById('apiTxt').textContent = 'API offline';
+  }
+}
+setInterval(checkHealth, 20000);
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const w = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast '+(type==='err'?'err':'ok');
+  el.textContent = msg;
+  w.appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function esc(s){ const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML; }
+function fmtDate(s){ if(!s) return '—'; const d=new Date(s); return isNaN(d)?s:d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function statusBadge(s){
+  if(s==='completed') return `<span class="badge badge-green">Done</span>`;
+  if(s==='running')   return `<span class="badge badge-yellow">Running</span>`;
+  if(s==='failed')    return `<span class="badge badge-red">Failed</span>`;
+  return `<span class="badge badge-gray">${esc(s)}</span>`;
+}
+function riskBadge(r){
+  if(r==='high')   return `<span class="badge badge-red">High</span>`;
+  if(r==='medium') return `<span class="badge badge-yellow">Medium</span>`;
+  if(r==='low')    return `<span class="badge badge-green">Low</span>`;
+  return `<span class="badge badge-gray">${esc(r||'—')}</span>`;
+}
+
+// ── Load stats ────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/api/admin/stats`);
+    if (!r.ok) { toast('Failed to load stats','err'); return; }
+    const d = await r.json();
+    renderStats(d);
+    renderShows(d.top_shows||[]);
+    renderJobs(d.recent_jobs||[]);
+    renderScans(d.recent_scans||[]);
+    document.getElementById('dbInfo').textContent = `Database: ${d.db_size_mb} MB`;
+    document.getElementById('sysInfo').innerHTML = `
+      <div>Shows monitored: <strong>${d.shows}</strong></div>
+      <div>Total search jobs: <strong>${d.jobs_total}</strong></div>
+      <div>Jobs running now: <strong style="color:${d.jobs_running>0?'var(--risk-med)':'var(--text-muted)'}">${d.jobs_running}</strong></div>
+      <div>File scans done: <strong>${d.scans_total}</strong></div>
+      <div>Database size: <strong>${d.db_size_mb} MB</strong></div>
+    `;
+  } catch(e) { toast('Error loading stats: '+e.message,'err'); }
+}
+
+function renderStats(d) {
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat-tile danger">
+      <div class="stat-label">Confirmed Stolen</div>
+      <div class="stat-value">${d.confirmed_stolen}</div>
+      <div class="stat-sub">manually verified</div>
+    </div>
+    <div class="stat-tile warning">
+      <div class="stat-label">Pending Review</div>
+      <div class="stat-value">${d.unreviewed}</div>
+      <div class="stat-sub">awaiting decision</div>
+    </div>
+    <div class="stat-tile safe">
+      <div class="stat-label">Cleared</div>
+      <div class="stat-value">${d.confirmed_safe}</div>
+      <div class="stat-sub">marked not stolen</div>
+    </div>
+    <div class="stat-tile accent">
+      <div class="stat-label">Shows Tracked</div>
+      <div class="stat-value">${d.shows}</div>
+      <div class="stat-sub">active monitors</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-label">Total Videos</div>
+      <div class="stat-value" style="color:var(--text)">${d.videos}</div>
+      <div class="stat-sub">in database</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-label">Search Jobs</div>
+      <div class="stat-value" style="color:var(--text)">${d.jobs_total}</div>
+      <div class="stat-sub">${d.jobs_running} running</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-label">File Scans</div>
+      <div class="stat-value" style="color:var(--text)">${d.scans_total}</div>
+      <div class="stat-sub">audio / video</div>
+    </div>
+  `;
+}
+
+function renderShows(shows) {
+  document.getElementById('showCount').textContent = shows.length + ' shows';
+  if (!shows.length) {
+    document.getElementById('showsTable').innerHTML = `<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">No shows yet</td></tr>`;
+    return;
+  }
+  document.getElementById('showsTable').innerHTML = shows.map(s => `
+    <tr>
+      <td class="td-name">${esc(s.show_name)}</td>
+      <td><span class="badge badge-red">${s.stolen||0}</span></td>
+      <td><span class="badge badge-green">${s.safe||0}</span></td>
+      <td>${s.total||0}</td>
+      <td class="td-mono">${fmtDate(s.last_activity)}</td>
+    </tr>`).join('');
+}
+
+function renderJobs(jobs) {
+  if (!jobs.length) {
+    document.getElementById('jobsTable').innerHTML = `<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">No jobs yet</td></tr>`;
+    return;
+  }
+  document.getElementById('jobsTable').innerHTML = jobs.map(j => `
+    <tr>
+      <td class="td-name">${esc(j.query)}</td>
+      <td>${statusBadge(j.status)}</td>
+      <td>${j.total_found||0}</td>
+      <td>${j.stolen_count||0}</td>
+      <td class="td-mono">${fmtDate(j.created_at)}</td>
+    </tr>`).join('');
+}
+
+function renderScans(scans) {
+  if (!scans.length) {
+    document.getElementById('scansTable').innerHTML = `<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">No file scans yet</td></tr>`;
+    return;
+  }
+  document.getElementById('scansTable').innerHTML = scans.map(s => `
+    <tr>
+      <td class="td-name" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.filename)}">${esc(s.filename)}</td>
+      <td><span class="badge badge-gray">${esc(s.file_type||'—')}</span></td>
+      <td>${riskBadge(s.risk_level)}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td class="td-mono">${fmtDate(s.scanned_at)}</td>
+    </tr>`).join('');
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────
+async function changePassword() {
+  const np = document.getElementById('newPw').value;
+  const cp = document.getElementById('confPw').value;
+  if (!np) { toast('Enter a new password','err'); return; }
+  if (np !== cp) { toast('Passwords do not match','err'); return; }
+  if (np.length < 6) { toast('Password must be at least 6 characters','err'); return; }
+  try {
+    const r = await fetch(`${API}/api/admin/change-password`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({new_password: np})
+    });
+    const d = await r.json();
+    if (r.ok) { toast(d.message||'Password updated'); document.getElementById('newPw').value=''; document.getElementById('confPw').value=''; }
+    else toast(d.detail||'Failed','err');
+  } catch { toast('Error changing password','err'); }
+}
+
+async function clearDatabase() {
+  if (!confirm('CLEAR ENTIRE DATABASE?\n\nThis permanently deletes all tracked videos, search jobs, and review history for every show.\n\nThis cannot be undone.')) return;
+  try {
+    const r = await fetch(`${API}/api/database/clear-all`,{method:'DELETE'});
+    const d = await r.json();
+    if (r.ok) { toast(`Cleared — ${d.deleted_videos} videos removed`); loadStats(); }
+    else toast(d.detail||'Failed','err');
+  } catch { toast('Error','err'); }
+}
+
+async function exportAllStolen() {
+  try {
+    const r = await fetch(`${API}/api/confirmed-stolen`);
+    const videos = await r.json();
+    if (!videos.length) { toast('No confirmed stolen videos to export','err'); return; }
+    const csvEsc = v => '"'+String(v??'').replace(/"/g,'""')+'"';
+    const headers = ['Show','Title','Channel','Channel URL','Video URL','Upload Date','Source'];
+    const rows = videos.map(v=>[
+      v.show_name, v.title||'', v.channel||'', v.channel_url||'',
+      v.url||`https://www.youtube.com/watch?v=${v.video_id}`,
+      v.upload_date||'', v.source||''
+    ].map(csvEsc).join(','));
+    const csv = '﻿'+[headers.map(csvEsc).join(','),...rows].join('\r\n');
+    const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href=url; a.download=`copyguard_stolen_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},500);
+    toast(`Exported ${videos.length} stolen videos`);
+  } catch { toast('Export failed','err'); }
+}
+
+// Enter key on login
+document.getElementById('lp').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+</script>

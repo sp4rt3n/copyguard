@@ -112,6 +112,10 @@ app.add_middleware(AuthMiddleware)
 def root():
     return RedirectResponse(url="/app/")
 
+@app.get("/admin")
+def admin_redirect():
+    return RedirectResponse(url="/app/admin.html")
+
 
 @app.on_event("startup")
 def startup():
@@ -747,4 +751,73 @@ def set_confirmation(show_name: str, video_id: str, body: ConfirmRequest):
     """Manually confirm or dismiss a suspected stolen video."""
     set_video_confirmed(show_name, video_id, body.confirmed)
     return {"ok": True, "video_id": video_id, "confirmed": body.confirmed}
+
+
+# ---------------------------------------------------------------------------
+# Admin endpoints
+# ---------------------------------------------------------------------------
+@app.get("/api/admin/stats")
+def admin_stats():
+    """Aggregate stats for the admin dashboard."""
+    from database import get_conn, DB_PATH
+    import os as _os
+    with get_conn() as conn:
+        videos = conn.execute("SELECT COUNT(*) as n FROM known_stolen_videos").fetchone()["n"]
+        confirmed_stolen = conn.execute("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed=1").fetchone()["n"]
+        confirmed_safe   = conn.execute("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed=0").fetchone()["n"]
+        unreviewed       = conn.execute("SELECT COUNT(*) as n FROM known_stolen_videos WHERE confirmed IS NULL AND stolen=1").fetchone()["n"]
+        shows            = conn.execute("SELECT COUNT(DISTINCT show_name) as n FROM known_stolen_videos").fetchone()["n"]
+        jobs_total       = conn.execute("SELECT COUNT(*) as n FROM search_jobs").fetchone()["n"]
+        jobs_running     = conn.execute("SELECT COUNT(*) as n FROM search_jobs WHERE status='running'").fetchone()["n"]
+        scans_total      = conn.execute("SELECT COUNT(*) as n FROM scans").fetchone()["n"]
+        top_shows        = conn.execute(
+            """SELECT show_name,
+                      COUNT(*) as total,
+                      SUM(CASE WHEN confirmed=1 THEN 1 ELSE 0 END) as stolen,
+                      SUM(CASE WHEN confirmed=0 THEN 1 ELSE 0 END) as safe,
+                      MAX(first_found) as last_activity
+               FROM known_stolen_videos
+               GROUP BY show_name ORDER BY stolen DESC, total DESC LIMIT 20"""
+        ).fetchall()
+        recent_jobs = conn.execute(
+            "SELECT id,query,status,total_found,stolen_count,created_at FROM search_jobs ORDER BY id DESC LIMIT 10"
+        ).fetchall()
+        recent_scans = conn.execute(
+            "SELECT id,filename,file_type,risk_level,status,scanned_at FROM scans ORDER BY id DESC LIMIT 10"
+        ).fetchall()
+
+    db_size_mb = round(_os.path.getsize(DB_PATH) / 1024 / 1024, 2) if _os.path.exists(DB_PATH) else 0
+
+    return {
+        "videos": videos,
+        "confirmed_stolen": confirmed_stolen,
+        "confirmed_safe": confirmed_safe,
+        "unreviewed": unreviewed,
+        "shows": shows,
+        "jobs_total": jobs_total,
+        "jobs_running": jobs_running,
+        "scans_total": scans_total,
+        "db_size_mb": db_size_mb,
+        "top_shows": [dict(r) for r in top_shows],
+        "recent_jobs": [dict(r) for r in recent_jobs],
+        "recent_scans": [dict(r) for r in recent_scans],
+    }
+
+
+@app.post("/api/admin/change-password")
+def change_password(body: dict):
+    """Change admin password — updates the .env file."""
+    import re as _re
+    new_pass = (body.get("new_password") or "").strip()
+    if len(new_pass) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        text = env_path.read_text()
+        if "ADMIN_PASSWORD=" in text:
+            text = _re.sub(r"^ADMIN_PASSWORD=.*$", f"ADMIN_PASSWORD={new_pass}", text, flags=_re.MULTILINE)
+        else:
+            text += f"\nADMIN_PASSWORD={new_pass}\n"
+        env_path.write_text(text)
+    return {"ok": True, "message": "Password updated — restart the app to apply"}
 
