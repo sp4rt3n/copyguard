@@ -1464,7 +1464,25 @@ function showApp() {
     const r = await _origFetch(`${API}/api/auth/verify`, {
       headers: { Authorization: 'Bearer ' + token }
     });
-    if (r.ok) { showApp(); } else { _clearToken(); showLogin(); }
+    if (r.ok) {
+      const d = await r.json();
+      const role = d.role || 'viewer';
+      showApp();
+      // Viewer = read-only: disable all action buttons
+      if (role === 'viewer') {
+        document.querySelectorAll(
+          '#finderBtn, #nextRoundBtn, .search-btn, .btn-confirm, .btn-dismiss, #addChannelBtn, [onclick="addStolenUrl()"], [onclick="scanStolenChannel()"], [onclick="clearEntireDatabase()"], [onclick="addSearchKeyword()"]'
+        ).forEach(el => { el.disabled = true; el.title = 'View-only account'; el.style.opacity = '.4'; el.style.cursor = 'not-allowed'; });
+        const badge = document.createElement('span');
+        badge.textContent = 'VIEW ONLY';
+        badge.style.cssText = 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3);margin-right:4px';
+        document.querySelector('.header-right')?.prepend(badge);
+      }
+      // Show Admin button only for admins
+      if (role !== 'admin') {
+        document.querySelector('[onclick="location.href=\'/admin\'"]')?.remove();
+      }
+    } else { _clearToken(); showLogin(); }
   } catch { showLogin(); }
 })();
 // ─────────────────────────────────────────────────────────────────────────

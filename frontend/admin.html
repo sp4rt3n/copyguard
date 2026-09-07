@@ -317,6 +317,7 @@
           <div>
             <label style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:5px">Role</label>
             <select id="nuRole" class="inp" style="cursor:pointer">
+              <option value="operator">Operator</option>
               <option value="viewer">Viewer</option>
               <option value="admin">Admin</option>
             </select>
@@ -326,7 +327,9 @@
           </div>
         </div>
         <div style="font-size:10px;color:var(--text-dim);margin-top:8px">
-          <strong>Viewer</strong> — can use the main app (scan, review) &nbsp;·&nbsp; <strong>Admin</strong> — full access including this admin panel
+          <strong>Operator</strong> — full app access (scan, search, review) &nbsp;·&nbsp;
+          <strong>Viewer</strong> — read-only, view results only &nbsp;·&nbsp;
+          <strong>Admin</strong> — everything + admin panel + user management
         </div>
       </div>
 
@@ -641,18 +644,20 @@ function renderUsers(users) {
     <tr>
       <td class="td-mono" style="color:var(--text-dim)">${u.id}</td>
       <td class="td-name">${esc(u.username)} ${u.username===(_currentUser||'')?'<span class="badge badge-gray" style="font-size:9px">you</span>':''}</td>
-      <td>${u.role==='admin'
-          ? `<span class="badge badge-red">Admin</span>`
-          : `<span class="badge badge-gray">Viewer</span>`}</td>
+      <td>${u.role==='admin'    ? `<span class="badge badge-red">Admin</span>`
+          : u.role==='operator' ? `<span class="badge badge-yellow">Operator</span>`
+          :                       `<span class="badge badge-gray">Viewer</span>`}</td>
       <td class="td-mono">${fmtDate(u.created_at)}</td>
       <td class="td-mono">${u.last_login ? fmtDate(u.last_login) : '<span style="color:var(--text-dim)">Never</span>'}</td>
       <td style="text-align:right">
         <div style="display:flex;gap:6px;justify-content:flex-end">
           <button class="btn-sm" onclick="promptResetPassword(${u.id},'${esc(u.username)}')">Reset PW</button>
-          <button class="btn-sm" onclick="toggleRole(${u.id},'${u.role}','${esc(u.username)}')"
-            style="color:var(--accent);border-color:rgba(6,200,150,.3)">
-            ${u.role==='admin' ? '→ Viewer' : '→ Admin'}
-          </button>
+          <select onchange="changeRole(${u.id},'${esc(u.username)}',this.value)"
+            style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:3px 6px;font-size:11px;color:var(--text-muted);cursor:pointer">
+            <option value="admin"    ${u.role==='admin'   ?'selected':''}>Admin</option>
+            <option value="operator" ${u.role==='operator'?'selected':''}>Operator</option>
+            <option value="viewer"   ${u.role==='viewer'  ?'selected':''}>Viewer</option>
+          </select>
           <button class="btn-sm btn-danger" onclick="removeUser(${u.id},'${esc(u.username)}')">Delete</button>
         </div>
       </td>
@@ -691,18 +696,16 @@ async function removeUser(id, username) {
   } catch { toast('Error','err'); }
 }
 
-async function toggleRole(id, currentRole, username) {
-  const newRole = currentRole === 'admin' ? 'viewer' : 'admin';
-  if (!confirm(`Change "${username}" role to ${newRole}?`)) return;
+async function changeRole(id, username, newRole) {
   try {
     const r = await fetch(`${API}/api/admin/users/${id}/role`, {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({role: newRole})
     });
     const d = await r.json();
-    if (r.ok) { toast(`Role updated to ${newRole}`); loadUsers(); }
-    else toast(d.detail||'Failed','err');
-  } catch { toast('Error','err'); }
+    if (r.ok) { toast(`"${username}" role set to ${newRole}`); loadUsers(); }
+    else { toast(d.detail||'Failed','err'); loadUsers(); }
+  } catch { toast('Error','err'); loadUsers(); }
 }
 
 async function promptResetPassword(id, username) {

@@ -52,8 +52,14 @@ def _make_token(username: str, role: str = "viewer") -> str:
 def _decode_token(token: str) -> dict:
     return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
+def _extract_token(creds) -> str:
+    if not creds:
+        return ""
+    # FastAPI versions use .credentials; older used .token
+    return getattr(creds, "credentials", None) or getattr(creds, "token", None) or ""
+
 def require_auth(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
-    token = creds.token if creds else None
+    token = _extract_token(creds)
     if not token:
         raise HTTPException(401, "Not authenticated")
     try:
@@ -857,8 +863,8 @@ def api_create_user(body: CreateUserRequest, _: dict = Depends(require_admin)):
         raise HTTPException(400, "Username is required")
     if len(body.password) < 6:
         raise HTTPException(400, "Password must be at least 6 characters")
-    if body.role not in ("admin", "viewer"):
-        raise HTTPException(400, "Role must be 'admin' or 'viewer'")
+    if body.role not in ("admin", "operator", "viewer"):
+        raise HTTPException(400, "Role must be admin, operator, or viewer")
     try:
         uid = create_user(body.username.strip(), body.password, body.role)
         return {"ok": True, "id": uid, "username": body.username.strip(), "role": body.role}
@@ -890,8 +896,8 @@ def api_update_user_password(user_id: int, body: UpdatePasswordRequest, _: dict 
 
 @app.patch("/api/admin/users/{user_id}/role")
 def api_update_user_role(user_id: int, body: UpdateRoleRequest, payload: dict = Depends(require_admin)):
-    if body.role not in ("admin", "viewer"):
-        raise HTTPException(400, "Role must be 'admin' or 'viewer'")
+    if body.role not in ("admin", "operator", "viewer"):
+        raise HTTPException(400, "Role must be admin, operator, or viewer")
     users = list_users()
     target = next((u for u in users if u["id"] == user_id), None)
     if not target:

@@ -129,7 +129,11 @@ def _verify_pw(password: str, hashed: str) -> bool:
     except Exception:
         return False
 
+VALID_ROLES = {"admin", "operator", "viewer"}
+
 def create_user(username: str, password: str, role: str = "viewer") -> int:
+    if role not in VALID_ROLES:
+        role = "viewer"
     with get_conn() as conn:
         cur = conn.execute(
             "INSERT INTO users (username, password_hash, role) VALUES (?,?,?)",
@@ -182,9 +186,14 @@ def user_count() -> int:
         return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
 def seed_admin_user(username: str, password: str):
-    """Create the admin user from env vars if no users exist yet."""
-    if user_count() == 0:
+    """Ensure admin user exists. Creates if missing; upgrades to admin role if already exists."""
+    existing = get_user_by_username(username)
+    if not existing:
         create_user(username, password, role="admin")
+    elif existing["role"] != "admin":
+        # Ensure the env-configured user always has admin role
+        with get_conn() as conn:
+            conn.execute("UPDATE users SET role='admin' WHERE username=?", (username.strip().lower(),))
 
 
 def create_scan(filename: str, file_type: str, file_size: int) -> int:
