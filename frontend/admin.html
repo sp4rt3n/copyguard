@@ -410,11 +410,13 @@ function showApp() {
     const r = await _origFetch(`${API}/api/auth/verify`,{headers:{Authorization:'Bearer '+t}});
     if (r.ok) {
       const d = await r.json();
-      _currentUser = d.username;
-      // Hide user management section for non-admins
       if (d.role !== 'admin') {
-        document.getElementById('userSection').style.display = 'none';
+        // Non-admin users have no business on this page
+        _clearTok();
+        location.replace('/app/');
+        return;
       }
+      _currentUser = d.username;
       showApp();
     } else { _clearTok(); showLogin(); }
   } catch { showLogin(); }

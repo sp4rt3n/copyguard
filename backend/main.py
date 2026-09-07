@@ -86,11 +86,13 @@ VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".flv"}
 
 app = FastAPI(title="Copyright Detector API", version="1.0.0")
 
+_ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_ALLOWED_ORIGINS or ["*"],
+    allow_credentials=bool(_ALLOWED_ORIGINS),
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 frontend_path = Path(__file__).parent.parent / "frontend"
@@ -823,7 +825,7 @@ def admin_stats():
 
 
 @app.post("/api/admin/change-password")
-def change_password(body: dict):
+def change_password(body: dict, _: dict = Depends(require_admin)):
     """Change admin password — updates the .env file."""
     import re as _re
     new_pass = (body.get("new_password") or "").strip()

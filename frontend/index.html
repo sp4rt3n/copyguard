@@ -1060,7 +1060,7 @@
       <span class="api-dot" id="apiDot"></span>
       <span id="apiStatusText">checking…</span>
     </span>
-    <button class="btn-ghost" onclick="location.href='/admin'" style="color:var(--accent);border-color:rgba(6,200,150,.3)">Admin</button>
+    <button id="adminBtn" class="btn-ghost" onclick="location.href='/admin'" style="color:var(--accent);border-color:rgba(6,200,150,.3);display:none" hidden>Admin</button>
     <button class="btn-ghost" onclick="toggleTheme()">Toggle theme</button>
     <button class="btn-ghost" onclick="doLogout()" style="color:var(--risk-high);border-color:rgba(239,68,68,.3)" onmouseover="this.style.background='var(--risk-high-bg)'" onmouseout="this.style.background=''">Logout</button>
   </div>
@@ -1478,9 +1478,10 @@ function showApp() {
         badge.style.cssText = 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3);margin-right:4px';
         document.querySelector('.header-right')?.prepend(badge);
       }
-      // Show Admin button only for admins
-      if (role !== 'admin') {
-        document.querySelector('[onclick="location.href=\'/admin\'"]')?.remove();
+      // Show Admin button only for admins — hidden by default in HTML
+      if (role === 'admin') {
+        const btn = document.getElementById('adminBtn');
+        if (btn) { btn.hidden = false; btn.style.display = ''; }
       }
     } else { _clearToken(); showLogin(); }
   } catch { showLogin(); }
