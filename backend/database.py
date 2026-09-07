@@ -102,6 +102,89 @@ def init_db():
                 conn.execute(f"ALTER TABLE known_stolen_videos ADD COLUMN {col} {coltype}")
             except Exception:
                 pass
+        # Users table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                username     TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                role         TEXT NOT NULL DEFAULT 'viewer',
+                created_at   TEXT DEFAULT (datetime('now')),
+                last_login   TEXT
+            )
+        """)
+
+
+# ---------------------------------------------------------------------------
+# User management
+# ---------------------------------------------------------------------------
+def _hash_pw(password: str) -> str:
+    from passlib.hash import bcrypt
+    return bcrypt.hash(password)
+
+def _verify_pw(password: str, hashed: str) -> bool:
+    from passlib.hash import bcrypt
+    try:
+        return bcrypt.verify(password, hashed)
+    except Exception:
+        return False
+
+def create_user(username: str, password: str, role: str = "viewer") -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO users (username, password_hash, role) VALUES (?,?,?)",
+            (username.strip().lower(), _hash_pw(password), role)
+        )
+        return cur.lastrowid
+
+def get_user_by_username(username: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE username=?", (username.strip().lower(),)
+        ).fetchone()
+        return dict(row) if row else None
+
+def verify_user(username: str, password: str) -> dict | None:
+    """Return user dict if credentials valid, else None."""
+    user = get_user_by_username(username)
+    if not user:
+        return None
+    if not _verify_pw(password, user["password_hash"]):
+        return None
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET last_login=datetime('now') WHERE id=?", (user["id"],))
+    return user
+
+def list_users() -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id,username,role,created_at,last_login FROM users ORDER BY id"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+def delete_user(user_id: int):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+
+def update_user_password(user_id: int, new_password: str):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash=? WHERE id=?",
+            (_hash_pw(new_password), user_id)
+        )
+
+def update_user_role(user_id: int, role: str):
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET role=? WHERE id=?", (role, user_id))
+
+def user_count() -> int:
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+def seed_admin_user(username: str, password: str):
+    """Create the admin user from env vars if no users exist yet."""
+    if user_count() == 0:
+        create_user(username, password, role="admin")
 
 
 def create_scan(filename: str, file_type: str, file_size: int) -> int:

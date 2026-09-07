@@ -24,6 +24,8 @@ from database import (
     get_all_reviewed, get_review_summary,
     delete_known_video, clear_known_videos, clear_all_known_videos, get_all_known_for_show,
     get_confirmed_map,
+    verify_user, seed_admin_user,
+    create_user, list_users, delete_user, update_user_password, update_user_role, user_count,
 )
 from acoustid_scanner import scan_audio
 from url_downloader import download_url, is_valid_url, platform_name
@@ -43,20 +45,29 @@ JWT_ALGORITHM    = "HS256"
 
 _bearer = HTTPBearer(auto_error=False)
 
-def _make_token() -> str:
+def _make_token(username: str, role: str = "viewer") -> str:
     exp = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS)
-    return jwt.encode({"sub": ADMIN_USERNAME, "exp": exp}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode({"sub": username, "role": role, "exp": exp}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def _decode_token(token: str) -> dict:
+    return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
 def require_auth(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
     token = creds.token if creds else None
     if not token:
         raise HTTPException(401, "Not authenticated")
     try:
-        jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return _decode_token(token)
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Session expired — please log in again")
     except jwt.InvalidTokenError:
         raise HTTPException(401, "Invalid token")
+
+def require_admin(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    payload = require_auth(creds)
+    if payload.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    return payload
 
 # ---------------------------------------------------------------------------
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", str(Path(__file__).parent / "uploads")))
@@ -120,6 +131,7 @@ def admin_redirect():
 @app.on_event("startup")
 def startup():
     init_db()
+    seed_admin_user(ADMIN_USERNAME, ADMIN_PASSWORD)
 
 
 def _classify_file(filename: str) -> str:
@@ -306,15 +318,15 @@ class LoginRequest(BaseModel):
 
 @app.post("/api/login")
 def login(body: LoginRequest):
-    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
+    user = verify_user(body.username, body.password)
+    if not user:
         raise HTTPException(401, "Invalid username or password")
-    return {"token": _make_token(), "username": ADMIN_USERNAME}
+    return {"token": _make_token(user["username"], user["role"]), "username": user["username"], "role": user["role"]}
 
 @app.get("/api/auth/verify")
 def verify_token(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
-    """Check if the current token is valid."""
-    require_auth(creds)
-    return {"ok": True}
+    payload = require_auth(creds)
+    return {"ok": True, "username": payload.get("sub"), "role": payload.get("role", "viewer")}
 
 @app.get("/api/health")
 def health():
@@ -820,4 +832,76 @@ def change_password(body: dict):
             text += f"\nADMIN_PASSWORD={new_pass}\n"
         env_path.write_text(text)
     return {"ok": True, "message": "Password updated — restart the app to apply"}
+
+
+# ── User management (admin only) ──────────────────────────────────────────
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+    role: str = "viewer"   # "admin" or "viewer"
+
+class UpdatePasswordRequest(BaseModel):
+    new_password: str
+
+class UpdateRoleRequest(BaseModel):
+    role: str
+
+@app.get("/api/admin/users")
+def api_list_users(_: dict = Depends(require_admin)):
+    return list_users()
+
+@app.post("/api/admin/users")
+def api_create_user(body: CreateUserRequest, _: dict = Depends(require_admin)):
+    if not body.username.strip():
+        raise HTTPException(400, "Username is required")
+    if len(body.password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    if body.role not in ("admin", "viewer"):
+        raise HTTPException(400, "Role must be 'admin' or 'viewer'")
+    try:
+        uid = create_user(body.username.strip(), body.password, body.role)
+        return {"ok": True, "id": uid, "username": body.username.strip(), "role": body.role}
+    except Exception as e:
+        if "UNIQUE" in str(e):
+            raise HTTPException(409, f"Username '{body.username}' already exists")
+        raise HTTPException(500, str(e))
+
+@app.delete("/api/admin/users/{user_id}")
+def api_delete_user(user_id: int, payload: dict = Depends(require_admin)):
+    users = list_users()
+    target = next((u for u in users if u["id"] == user_id), None)
+    if not target:
+        raise HTTPException(404, "User not found")
+    if target["username"] == payload.get("sub"):
+        raise HTTPException(400, "Cannot delete your own account")
+    admins = [u for u in users if u["role"] == "admin"]
+    if target["role"] == "admin" and len(admins) <= 1:
+        raise HTTPException(400, "Cannot delete the last admin account")
+    delete_user(user_id)
+    return {"ok": True}
+
+@app.patch("/api/admin/users/{user_id}/password")
+def api_update_user_password(user_id: int, body: UpdatePasswordRequest, _: dict = Depends(require_admin)):
+    if len(body.new_password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    update_user_password(user_id, body.new_password)
+    return {"ok": True}
+
+@app.patch("/api/admin/users/{user_id}/role")
+def api_update_user_role(user_id: int, body: UpdateRoleRequest, payload: dict = Depends(require_admin)):
+    if body.role not in ("admin", "viewer"):
+        raise HTTPException(400, "Role must be 'admin' or 'viewer'")
+    users = list_users()
+    target = next((u for u in users if u["id"] == user_id), None)
+    if not target:
+        raise HTTPException(404, "User not found")
+    if target["username"] == payload.get("sub") and body.role != "admin":
+        raise HTTPException(400, "Cannot remove admin role from your own account")
+    admins = [u for u in users if u["role"] == "admin"]
+    if target["role"] == "admin" and body.role != "admin" and len(admins) <= 1:
+        raise HTTPException(400, "Cannot demote the last admin")
+    update_user_role(user_id, body.role)
+    return {"ok": True}
+
 
