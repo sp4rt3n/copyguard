@@ -2,85 +2,59 @@ services:
 
   db:
     image: postgres:16-alpine
+    container_name: copyguard-db
     environment:
       POSTGRES_DB: copyguard
       POSTGRES_USER: copyguard
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pg_data:/var/lib/postgresql/data
-    # no port exposure — only reachable inside Docker network
-    restart: always
+    # No ports published. The database is reachable only by the copyguard
+    # container over the internal compose network. If you need DBeaver access,
+    # tunnel to it instead of publishing the port:
+    #   ssh -L 5432:localhost:5432 <user>@lotusdev
+    # and add a temporary "127.0.0.1:5432:5432" mapping only while you need it.
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U copyguard -d copyguard"]
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "1"
-          memory: 512M
 
   copyguard:
     build: .
+    container_name: copyguard-app
     expose:
       - "8000"
     volumes:
       - copyguard_uploads:/app/data/uploads
+      # No source bind mount in production — the image is the artifact.
     env_file:
       - backend/.env
     environment:
-      - DATABASE_URL=postgresql://copyguard:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/copyguard
+      - DATABASE_URL=postgresql://copyguard:${POSTGRES_PASSWORD}@db:5432/copyguard
       - UPLOAD_DIR=/app/data/uploads
     depends_on:
       db:
         condition: service_healthy
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 1G
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "5"
+    restart: unless-stopped
+    # No --reload in production: it watches the filesystem and restarts workers
+    # on change, which is wasted work and an unnecessary failure mode here.
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
 
   nginx:
     image: nginx:alpine
+    container_name: copyguard-nginx
     ports:
-      - "80:80"
+      # Loopback only, port 8080: 80 is held by proofreader-nginx on this host,
+      # and public access comes through the Cloudflare Tunnel, not the host's
+      # network interface. Binding 0.0.0.0 would expose this app directly.
+      - "127.0.0.1:8080:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - copyguard
-    restart: always
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "3"
-
-  # Cloudflare Tunnel — set CLOUDFLARE_TUNNEL_TOKEN in backend/.env to enable
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}
-    depends_on:
-      - nginx
-    restart: always
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "3"
+    restart: unless-stopped
 
 volumes:
   pg_data:
