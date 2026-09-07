@@ -119,13 +119,13 @@ def init_db():
 # User management
 # ---------------------------------------------------------------------------
 def _hash_pw(password: str) -> str:
-    from passlib.hash import bcrypt
-    return bcrypt.hash(password)
+    import bcrypt
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 def _verify_pw(password: str, hashed: str) -> bool:
-    from passlib.hash import bcrypt
+    import bcrypt
     try:
-        return bcrypt.verify(password, hashed)
+        return bcrypt.checkpw(password.encode(), hashed.encode())
     except Exception:
         return False
 
