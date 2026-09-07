@@ -1334,7 +1334,8 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
-const API = 'http://localhost:8000';
+// Use relative URL so the app works behind Nginx/tunnel/any domain
+const API = '';
 let activeScans = {};
 let selectedScanId = null;
 let allScans = [];
