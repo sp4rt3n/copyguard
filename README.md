@@ -53,31 +53,6 @@ CopyGuard automates the entire process:
 
 ---
 
-## User Roles
-
-CopyGuard has three access levels so you can give different team members the right level of access:
-
-| Role | What They Can Do |
-|---|---|
-| **Admin** | Everything — plus the Admin Panel to manage users, view stats, change passwords, and clear the database |
-| **Operator** | Full access to search, scan, review, and confirm stolen videos — cannot access Admin Panel |
-| **Viewer** | Read-only — can view search results and confirmed stolen lists but cannot make any changes |
-
----
-
-## Admin Dashboard
-
-The Admin Panel (`/admin`) gives the admin a full overview of the system:
-
-- **Stats tiles** — Confirmed stolen count, pending review count, cleared videos, total videos in database, active search jobs, file scans
-- **Monitored Shows table** — Per-show breakdown of confirmed stolen, pending review, cleared, and total videos found
-- **Recent Search Jobs** — History of every scan with status, videos found, and stolen count
-- **Recent File Scans** — History of uploaded audio/video files scanned
-- **Settings** — Change admin password, export all stolen videos to CSV, clear the entire database
-- **User Management** — Create, delete, and manage team members with role assignment
-
----
-
 ## Deployment (Docker)
 
 ### Prerequisites
@@ -117,32 +92,11 @@ UPLOAD_DIR=uploads
 ## Technology
 
 - **Backend** — Python / FastAPI
-- **Database** — SQLite (persisted via Docker volume)
+- **Database** — PostgreSQL (persisted via Docker volume)
 - **YouTube scanning** — YouTube RSS feeds + oEmbed API (no API key required)
 - **Authentication** — JWT tokens with role-based access control
 - **Frontend** — Vanilla HTML/CSS/JS (no framework dependencies)
 - **Infrastructure** — Docker + Nginx reverse proxy + optional Cloudflare Tunnel
-
----
-
-## Security
-
-- All API routes are protected — login required
-- Role enforcement at both API and UI level
-- Admin-only endpoints require admin JWT (stats, user management, database clear, password change)
-- Non-admin users are redirected away from the Admin Panel automatically
-- Passwords are hashed with bcrypt
-
----
-
-## Default Login
-
-| Field | Value |
-|---|---|
-| Username | `admin` (or whatever you set in `.env`) |
-| Password | Set in `backend/.env` as `ADMIN_PASSWORD` |
-| Admin Panel | `http://your-url/admin` |
-| Main App | `http://your-url/app/` |
 
 ---
 
