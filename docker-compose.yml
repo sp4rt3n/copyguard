@@ -1,8 +1,9 @@
 services:
+
   copyguard:
     build: .
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - copyguard_data:/app/data
     environment:
@@ -11,6 +12,32 @@ services:
       - ACOUSTID_API_KEY=${ACOUSTID_API_KEY:-}
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-500}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - copyguard
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - nginx
+    restart: unless-stopped
+    profiles:
+      - tunnel   # only starts when you run: docker compose --profile tunnel up
 
 volumes:
   copyguard_data:
