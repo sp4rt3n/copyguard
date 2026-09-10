@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: copyguard
       POSTGRES_USER: copyguard
-      POSTGRES_PASSWORD: copyguard2024
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pg_data:/var/lib/postgresql/data
     ports:
@@ -27,7 +27,7 @@ services:
     env_file:
       - backend/.env
     environment:
-      - DATABASE_URL=postgresql://copyguard:copyguard2024@db:5432/copyguard
+      - DATABASE_URL=postgresql://copyguard:${POSTGRES_PASSWORD}@db:5432/copyguard
       - UPLOAD_DIR=/app/data/uploads
     depends_on:
       db:

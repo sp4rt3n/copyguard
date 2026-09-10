@@ -37,4 +37,5 @@ echo "  CopyGuard running at http://localhost:8000"
 echo "  Dashboard:           http://localhost:8000/app"
 echo ""
 
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# Bind to loopback by default; use HOST=0.0.0.0 only for Docker/LAN access
+uvicorn main:app --host "${HOST:-127.0.0.1}" --port 8000 --reload
